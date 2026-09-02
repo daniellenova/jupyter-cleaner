@@ -61,14 +61,21 @@ def main():
     # Проверяем, передан ли путь к файлу в аргументах командной строки
     if len(sys.argv) < 2:
         # Если аргументов недостаточно, выводим инструкцию по использованию
-        print("Usage: python converter.py <notebook.ipynb>")
+        print("Использование: python converter.py <notebook.ipynb>")
         return
 
     # Получаем путь к файлу из первого аргумента командной строки
     file_path = sys.argv[1]
 
-    # Загружаем notebook из файла
-    notebook = load_notebook(file_path)
+    # Загружаем notebook из файла и сообщаем об ожидаемых ошибках ввода
+    try:
+        notebook = load_notebook(file_path)
+    except FileNotFoundError:
+        print(f"Ошибка: файл '{file_path}' не найден.")
+        return
+    except json.JSONDecodeError:
+        print(f"Ошибка: файл '{file_path}' содержит некорректный JSON.")
+        return
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
     markdown_text = convert_notebook(notebook)
