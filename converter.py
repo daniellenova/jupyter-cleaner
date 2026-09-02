@@ -1,3 +1,4 @@
+import html  # Импортируем стандартный модуль для декодирования HTML-сущностей
 import json  # Импортируем модуль json для работы с JSON-файлами
 import sys  # Импортируем модуль sys для работы с аргументами командной строки
 
@@ -27,6 +28,211 @@ def normalize_output_text(value):
     return None
 
 
+def _opening_tag_end(html_text, tag_name, start):
+    """Возвращает позицию конца ожидаемого открывающего HTML-тега."""
+    prefix = f"<{tag_name}"
+    if not html_text.startswith(prefix, start):
+        return -1
+
+    name_end = start + len(prefix)
+    if name_end >= len(html_text) or html_text[name_end] not in " \t\r\n>":
+        return -1
+    return html_text.find(">", name_end)
+
+
+def _extract_blocks(html_text, tag_name):
+    """Извлекает последовательные блоки одного типа без посторонней разметки."""
+    blocks = []
+    position = 0
+    closing_tag = f"</{tag_name}>"
+
+    while position < len(html_text):
+        while position < len(html_text) and html_text[position].isspace():
+            position += 1
+        if position == len(html_text):
+            break
+
+        opening_end = _opening_tag_end(html_text, tag_name, position)
+        if opening_end == -1:
+            return None
+        closing_start = html_text.find(closing_tag, opening_end + 1)
+        if closing_start == -1:
+            return None
+
+        blocks.append(html_text[opening_end + 1:closing_start])
+        position = closing_start + len(closing_tag)
+
+    return blocks
+
+
+def _extract_cells(row_html):
+    """Извлекает простые ячейки th/td из одной строки таблицы."""
+    cells = []
+    position = 0
+
+    while position < len(row_html):
+        while position < len(row_html) and row_html[position].isspace():
+            position += 1
+        if position == len(row_html):
+            break
+
+        tag_name = None
+        for candidate in ("th", "td"):
+            if _opening_tag_end(row_html, candidate, position) != -1:
+                tag_name = candidate
+                break
+        if tag_name is None:
+            return None
+
+        opening_end = _opening_tag_end(row_html, tag_name, position)
+        opening_tag = row_html[position:opening_end + 1].lower()
+        if "rowspan" in opening_tag or "colspan" in opening_tag:
+            return None
+
+        closing_tag = f"</{tag_name}>"
+        closing_start = row_html.find(closing_tag, opening_end + 1)
+        if closing_start == -1:
+            return None
+        value = row_html[opening_end + 1:closing_start]
+        if "<" in value or ">" in value:
+            return None
+
+        value = html.unescape(value)
+        value = value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+        cells.append((tag_name, value.strip().replace("|", "\\|")))
+        position = closing_start + len(closing_tag)
+
+    return cells
+
+
+def _has_supported_table_wrapper(prefix, suffix):
+    """Проверяет необязательную обёртку div/style вокруг таблицы Pandas."""
+    position = 0
+    while position < len(prefix) and prefix[position].isspace():
+        position += 1
+
+    has_div = False
+    div_end = _opening_tag_end(prefix, "div", position)
+    if div_end != -1:
+        has_div = True
+        position = div_end + 1
+        while position < len(prefix) and prefix[position].isspace():
+            position += 1
+
+    style_end = _opening_tag_end(prefix, "style", position)
+    if style_end != -1:
+        style_close = prefix.find("</style>", style_end + 1)
+        if style_close == -1:
+            return False
+        style_content = prefix[style_end + 1:style_close]
+        if "<" in style_content or ">" in style_content:
+            return False
+        position = style_close + len("</style>")
+
+    if prefix[position:].strip():
+        return False
+
+    expected_suffix = "</div>" if has_div else ""
+    return suffix.strip() == expected_suffix
+
+
+def _parse_pandas_table(html_text):
+    """Разбирает только простой формат Pandas, описанный в документации."""
+    if not isinstance(html_text, str):
+        return None
+
+    table_start = html_text.find("<table")
+    if table_start == -1:
+        return None
+    table_open_end = _opening_tag_end(html_text, "table", table_start)
+    if table_open_end == -1:
+        return None
+
+    opening_tag = html_text[table_start:table_open_end + 1]
+    attributes = opening_tag[len("<table"):-1].replace("'", '"')
+    class_marker = 'class="'
+    class_start = attributes.find(class_marker)
+    while class_start > 0 and not attributes[class_start - 1].isspace():
+        class_start = attributes.find(class_marker, class_start + len(class_marker))
+    if class_start == -1:
+        return None
+    class_end = attributes.find('"', class_start + len(class_marker))
+    if class_end == -1:
+        return None
+    classes = attributes[class_start + len(class_marker):class_end].split()
+    if "dataframe" not in classes:
+        return None
+
+    table_close = html_text.find("</table>", table_open_end + 1)
+    if table_close == -1:
+        return None
+    if not _has_supported_table_wrapper(
+            html_text[:table_start],
+            html_text[table_close + len("</table>"):],
+    ):
+        return None
+    table_body = html_text[table_open_end + 1:table_close]
+    if "<table" in table_body or "rowspan" in table_body.lower() or "colspan" in table_body.lower():
+        return None
+
+    sections = []
+    position = 0
+    for section_name in ("thead", "tbody"):
+        while position < len(table_body) and table_body[position].isspace():
+            position += 1
+        section_open_end = _opening_tag_end(table_body, section_name, position)
+        if section_open_end == -1:
+            return None
+        section_close_tag = f"</{section_name}>"
+        section_close = table_body.find(section_close_tag, section_open_end + 1)
+        if section_close == -1:
+            return None
+        sections.append(table_body[section_open_end + 1:section_close])
+        position = section_close + len(section_close_tag)
+    if table_body[position:].strip():
+        return None
+
+    header_rows = _extract_blocks(sections[0], "tr")
+    data_rows = _extract_blocks(sections[1], "tr")
+    if header_rows is None or len(header_rows) != 1 or not data_rows:
+        return None
+
+    parsed_rows = []
+    for row_html in header_rows + data_rows:
+        cells = _extract_cells(row_html)
+        if not cells:
+            return None
+        parsed_rows.append(cells)
+
+    column_count = len(parsed_rows[0])
+    if any(len(row) != column_count for row in parsed_rows):
+        return None
+    if any(tag_name != "th" for tag_name, value in parsed_rows[0]):
+        return None
+    if any(row[0][0] != "th" or any(tag != "td" for tag, value in row[1:])
+           for row in parsed_rows[1:]):
+        return None
+
+    return [[value for tag_name, value in row] for row in parsed_rows]
+
+
+def is_pandas_table(html_text):
+    """Проверяет, соответствует ли HTML поддерживаемой простой таблице Pandas."""
+    return _parse_pandas_table(html_text) is not None
+
+
+def convert_pandas_table(html_text):
+    """Преобразует поддерживаемую простую HTML-таблицу Pandas в Markdown."""
+    rows = _parse_pandas_table(html_text)
+    if rows is None:
+        return None
+
+    markdown_rows = ["| " + " | ".join(row) + " |" for row in rows]
+    separator = "|" + "---|" * len(rows[0])
+    markdown_rows.insert(1, separator)
+    return "\n".join(markdown_rows)
+
+
 def convert_output(output):
     """Преобразует один поддерживаемый текстовый результат в Markdown."""
     output_type = output.get("output_type")
@@ -37,8 +243,14 @@ def convert_output(output):
 
     elif output_type in ("execute_result", "display_data"):
         data = output.get("data", {})
-        if isinstance(data, dict) and "text/plain" in data:
-            output_text = normalize_output_text(data["text/plain"])
+        if isinstance(data, dict):
+            html_text = normalize_output_text(data.get("text/html"))
+            if html_text is not None:
+                markdown_table = convert_pandas_table(html_text)
+                if markdown_table is not None:
+                    return markdown_table
+            if "text/plain" in data:
+                output_text = normalize_output_text(data["text/plain"])
 
     if output_text is None:
         return ""

@@ -6,3 +6,7 @@
 html = "<strong>Готово</strong>"
 html
 ```
+
+```text
+'<strong>Готово</strong>'
+```
