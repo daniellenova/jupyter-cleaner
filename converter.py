@@ -42,10 +42,21 @@ def convert_notebook(notebook):
     return "\n\n".join(converted_cells)
 
 
+def get_output_path(input_path):
+    """Возвращает путь к Markdown-файлу вместо пути к notebook'у."""
+    return input_path[:-len(".ipynb")] + ".md"
+
+
+def save_markdown(markdown_text, output_path):
+    """Сохраняет Markdown в файл в кодировке UTF-8."""
+    with open(output_path, "w", encoding="utf-8") as file:
+        file.write(markdown_text)
+
+
 def main():
     """
     Главная функция программы.
-    Проверяет аргументы командной строки и выводит notebook в виде Markdown.
+    Проверяет аргументы командной строки и сохраняет notebook в виде Markdown.
     """
     # Проверяем, передан ли путь к файлу в аргументах командной строки
     if len(sys.argv) < 2:
@@ -59,8 +70,12 @@ def main():
     # Загружаем notebook из файла
     notebook = load_notebook(file_path)
 
-    # Преобразуем весь notebook и выводим итоговую Markdown-строку
-    print(convert_notebook(notebook))
+    # Преобразуем notebook, определяем путь результата и сохраняем Markdown
+    markdown_text = convert_notebook(notebook)
+    output_path = get_output_path(file_path)
+    save_markdown(markdown_text, output_path)
+
+    print(f"Создан файл: {output_path}")
 
 
 # Проверяем, запущен ли скрипт напрямую (а не импортирован как модуль)
