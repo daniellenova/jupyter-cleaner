@@ -1,5 +1,8 @@
 import unittest  # Импортируем модуль unittest для создания и запуска тестов
 from dataclasses import FrozenInstanceError
+from json import JSONDecodeError
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from cells import Cell, CodeCell, MarkdownCell
 from config import ConversionConfig
@@ -7,12 +10,35 @@ from converter import (
     convert_notebook,
     load_notebook,
 )
+from exceptions import InvalidNotebookError, NotebookError, NotebookNotFoundError
 from models import ConversionResult, ConversionStats
 from outputs import OutputProcessor, convert_output
 from tables import TableConverter
 
 
 # Импортируем тестируемые функции из модуля converter
+
+
+class NotebookLoadingTests(unittest.TestCase):
+    """Проверяет преобразование ошибок ввода в исключения предметной области."""
+
+    def test_missing_file_raises_notebook_error_with_original_cause(self):
+        with self.assertRaises(NotebookNotFoundError) as context:
+            load_notebook("definitely_missing.ipynb")
+
+        self.assertIsInstance(context.exception, NotebookError)
+        self.assertIsInstance(context.exception.__cause__, FileNotFoundError)
+
+    def test_invalid_json_raises_notebook_error_with_original_cause(self):
+        with TemporaryDirectory() as directory:
+            notebook_path = Path(directory) / "broken.ipynb"
+            notebook_path.write_text("{broken", encoding="utf-8")
+
+            with self.assertRaises(InvalidNotebookError) as context:
+                load_notebook(notebook_path)
+
+        self.assertIsInstance(context.exception, NotebookError)
+        self.assertIsInstance(context.exception.__cause__, JSONDecodeError)
 
 
 class ConversionModelTests(unittest.TestCase):

@@ -4,6 +4,7 @@ import sys  # Импортируем модуль sys для работы с а�
 
 from cells import CodeCell, MarkdownCell
 from config import ConversionConfig
+from exceptions import InvalidNotebookError, NotebookNotFoundError
 from models import ConversionResult, ConversionStats
 
 
@@ -17,10 +18,15 @@ def load_notebook(file_path):
     Returns:
         dict: Содержимое notebook'а в виде словаря Python
     """
-    # Открываем файл для чтения с указанием кодировки UTF-8
-    with open(file_path, "r", encoding="utf-8") as file:
-        # Парсим JSON и возвращаем результат
-        return json.load(file)
+    try:
+        # Открываем файл для чтения с указанием кодировки UTF-8
+        with open(file_path, "r", encoding="utf-8") as file:
+            # Парсим JSON и возвращаем результат
+            return json.load(file)
+    except FileNotFoundError as error:
+        raise NotebookNotFoundError(file_path) from error
+    except json.JSONDecodeError as error:
+        raise InvalidNotebookError(file_path) from error
 
 
 def convert_notebook(notebook, config=None):
@@ -144,14 +150,15 @@ def main():
 
     # Загружаем notebook из файла и сообщаем об ожидаемых ошибках ввода
     try:
-        input_size = os.path.getsize(file_path)
         notebook = load_notebook(file_path)
-    except FileNotFoundError:
+    except NotebookNotFoundError:
         print(f"Ошибка: файл '{file_path}' не найден.")
         return
-    except json.JSONDecodeError:
+    except InvalidNotebookError:
         print(f"Ошибка: файл '{file_path}' содержит некорректный JSON.")
         return
+
+    input_size = os.path.getsize(file_path)
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
     result = convert_notebook(notebook, config)
