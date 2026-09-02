@@ -29,10 +29,23 @@ def convert_code_cell(cell):
     return f"```python\n{code}\n```"
 
 
+def convert_notebook(notebook):
+    """Преобразует поддерживаемые ячейки notebook'а в одну Markdown-строку."""
+    converted_cells = []
+
+    for cell in notebook["cells"]:
+        if cell["cell_type"] == "markdown":
+            converted_cells.append(convert_markdown_cell(cell))
+        elif cell["cell_type"] == "code":
+            converted_cells.append(convert_code_cell(cell))
+
+    return "\n\n".join(converted_cells)
+
+
 def main():
     """
     Главная функция программы.
-    Проверяет аргументы командной строки и выводит первую кодовую ячейку.
+    Проверяет аргументы командной строки и выводит notebook в виде Markdown.
     """
     # Проверяем, передан ли путь к файлу в аргументах командной строки
     if len(sys.argv) < 2:
@@ -46,13 +59,8 @@ def main():
     # Загружаем notebook из файла
     notebook = load_notebook(file_path)
 
-    # Находим первую кодовую ячейку в notebook'е
-    code_cell = next(
-        cell for cell in notebook["cells"] if cell["cell_type"] == "code"
-    )
-
-    # Выводим кодовую ячейку как блок Python для Markdown
-    print(convert_code_cell(code_cell))
+    # Преобразуем весь notebook и выводим итоговую Markdown-строку
+    print(convert_notebook(notebook))
 
 
 # Проверяем, запущен ли скрипт напрямую (а не импортирован как модуль)
