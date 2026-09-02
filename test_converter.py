@@ -5,12 +5,9 @@ from converter import (
     convert_notebook,
     load_notebook,
 )
-from models import ConversionResult, ConversionStats
-from outputs import (
-    convert_output,
-    convert_pandas_table,
-    is_pandas_table,
-)
+from models import ConversionConfig, ConversionResult, ConversionStats
+from outputs import OutputProcessor, convert_output
+from tables import TableConverter
 
 
 # Импортируем тестируемые функции из модуля converter
@@ -181,9 +178,10 @@ class ConversionStatsTests(unittest.TestCase):
         output = notebook["cells"][1]["outputs"][0]
         html_text = "".join(output["data"]["text/html"])
 
-        self.assertTrue(is_pandas_table(html_text))
+        converter = TableConverter()
+        self.assertTrue(converter.is_supported(html_text))
         self.assertEqual(
-            convert_pandas_table(html_text),
+            converter.convert(html_text),
             "|  | age | salary |\n"
             "|---|---|---|\n"
             "| 0 | 25 | 50000 |\n"
@@ -194,6 +192,37 @@ class ConversionStatsTests(unittest.TestCase):
         self.assertNotIn("age  salary", converted)
         self.assertEqual(converted.count("| 0 | 25 | 50000 |"), 1)
 
+    def test_output_processor_delegates_html_table_conversion(self):
+        """OutputProcessor принимает решение и делегирует обработку таблицы."""
+
+        class RecordingTableConverter:
+            def __init__(self):
+                self.checked = []
+                self.converted = []
+
+            def is_supported(self, html_text):
+                self.checked.append(html_text)
+                return True
+
+            def convert(self, html_text):
+                self.converted.append(html_text)
+                return "| delegated |\n|---|"
+
+        converter = RecordingTableConverter()
+        processor = OutputProcessor(converter)
+        output = {
+            "output_type": "display_data",
+            "data": {"text/html": "<table>only table input</table>"},
+        }
+        stats = ConversionStats()
+
+        result = processor.process([output], ConversionConfig(keep_outputs=True), stats)
+
+        self.assertEqual(result, "| delegated |\n|---|")
+        self.assertEqual(converter.checked, ["<table>only table input</table>"])
+        self.assertEqual(converter.converted, ["<table>only table input</table>"])
+        self.assertEqual(stats.tables_converted, 1)
+
     def test_decodes_and_normalizes_cell_text(self):
         """Сущности, переносы и Markdown-разделитель обрабатываются в ячейке."""
         html_text = """<table class="dataframe">
@@ -203,7 +232,7 @@ Bob | team </td></tr></tbody>
 </table>"""
 
         self.assertEqual(
-            convert_pandas_table(html_text),
+            TableConverter().convert(html_text),
             "|  | name |\n|---|---|\n| 0 | Alice & Bob \\| team |",
         )
 
@@ -217,7 +246,7 @@ Bob | team </td></tr></tbody>
             },
         }
 
-        self.assertFalse(is_pandas_table(output["data"]["text/html"]))
+        self.assertFalse(TableConverter().is_supported(output["data"]["text/html"]))
         self.assertEqual(convert_output(output), "```text\nsafe fallback\n```")
 
     def test_rejects_arbitrary_content_around_table(self):
@@ -227,9 +256,10 @@ Bob | team </td></tr></tbody>
             '<tbody><tr><th>0</th></tr></tbody></table>'
         )
 
-        self.assertFalse(is_pandas_table("<p>unexpected</p>" + table))
-        self.assertFalse(is_pandas_table("<div>text" + table + "</div>"))
-        self.assertFalse(is_pandas_table("<div>" + table + "</div><p>extra</p>"))
+        converter = TableConverter()
+        self.assertFalse(converter.is_supported("<p>unexpected</p>" + table))
+        self.assertFalse(converter.is_supported("<div>text" + table + "</div>"))
+        self.assertFalse(converter.is_supported("<div>" + table + "</div><p>extra</p>"))
 
     def test_malformed_pandas_table_falls_back_or_is_skipped(self):
         """Повреждённая таблица не создаёт частичный Markdown."""
@@ -246,7 +276,7 @@ Bob | team </td></tr></tbody>
             "data": {"text/html": malformed},
         }
 
-        self.assertIsNone(convert_pandas_table(malformed))
+        self.assertIsNone(TableConverter().convert(malformed))
         self.assertEqual(convert_output(with_plain), "```text\nfallback\n```")
         self.assertEqual(convert_output(without_plain), "")
 
