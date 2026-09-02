@@ -6,6 +6,7 @@ from cells import CodeCell, MarkdownCell
 from config import ConversionConfig
 from exceptions import InvalidNotebookError, NotebookNotFoundError
 from models import ConversionResult, ConversionStats
+from outputs import OutputProcessor
 
 
 def load_notebook(file_path):
@@ -29,40 +30,53 @@ def load_notebook(file_path):
         raise InvalidNotebookError(file_path) from error
 
 
-def convert_notebook(notebook, config=None):
-    """Возвращает объект результата преобразования notebook'а."""
-    config = config if config is not None else ConversionConfig()
-    converted_cells = []
-    cells = notebook["cells"]
-    stats = ConversionStats(cells_total=len(cells))
+class NotebookConverter:
+    """Оркестрирует преобразование ячеек notebook'а в Markdown."""
 
-    for cell in cells:
-        cell_type = cell["cell_type"]
-        if cell_type not in ("markdown", "code"):
-            continue
+    def __init__(self, config):
+        self.config = config
+        self.output_processor = OutputProcessor()
 
-        source = "".join(cell["source"])
-        if cell_type == "markdown":
-            converted_cell = MarkdownCell(source)
-        else:
-            converted_cell = CodeCell(source, cell.get("outputs", []))
+    def convert(self, notebook):
+        """Преобразует notebook и возвращает его текст вместе со статистикой."""
+        cells = notebook["cells"]
+        stats = ConversionStats(cells_total=len(cells))
+        converted_cells = []
 
-        if converted_cell.is_empty() and config.remove_empty_cells:
-            if cell_type == "code":
-                converted_cell.output_processor.count_outputs(
-                    converted_cell.outputs, stats
+        for cell_data in cells:
+            cell_type = cell_data["cell_type"]
+            if cell_type not in ("markdown", "code"):
+                continue
+
+            source = "".join(cell_data["source"])
+            if cell_type == "markdown":
+                cell = MarkdownCell(source)
+            else:
+                cell = CodeCell(
+                    source,
+                    cell_data.get("outputs", []),
+                    self.output_processor,
                 )
-            stats.empty_cells_removed += 1
-            continue
+            if cell.is_empty() and self.config.remove_empty_cells:
+                if cell_type == "code":
+                    self.output_processor.count_outputs(cell.outputs, stats)
+                stats.empty_cells_removed += 1
+                continue
 
-        if cell_type == "markdown":
-            stats.markdown_cells += 1
-            converted_cells.append(converted_cell.convert())
-        else:
-            stats.code_cells += 1
-            converted_cells.append(converted_cell.convert(config, stats))
+            if cell_type == "markdown":
+                stats.markdown_cells += 1
+                converted_cells.append(cell.convert())
+            else:
+                stats.code_cells += 1
+                converted_cells.append(cell.convert(self.config, stats))
 
-    return ConversionResult("\n\n".join(converted_cells), stats)
+        return ConversionResult("\n\n".join(converted_cells), stats)
+
+
+def convert_notebook(notebook, config=None):
+    """Возвращает результат преобразования, сохраняя прежний интерфейс функции."""
+    config = config if config is not None else ConversionConfig()
+    return NotebookConverter(config).convert(notebook)
 
 
 def print_stats(stats):
@@ -161,7 +175,8 @@ def main():
     input_size = os.path.getsize(file_path)
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
-    result = convert_notebook(notebook, config)
+    converter = NotebookConverter(config)
+    result = converter.convert(notebook)
     output_path = get_output_path(file_path)
     save_markdown(result.markdown_text, output_path)
     output_size = os.path.getsize(output_path)

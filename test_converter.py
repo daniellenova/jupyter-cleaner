@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from cells import Cell, CodeCell, MarkdownCell
 from config import ConversionConfig
 from converter import (
+    NotebookConverter,
     convert_notebook,
     load_notebook,
 )
@@ -90,6 +91,36 @@ class ConverterOutputTests(unittest.TestCase):
         self.assertIsInstance(code, Cell)
         self.assertEqual(markdown.convert(), "# Заголовок\n")
         self.assertEqual(code.convert(), "```python\nprint('hello')\n```")
+
+    def test_notebook_converter_owns_config_and_shared_processors(self):
+        config = ConversionConfig(keep_outputs=True)
+        converter = NotebookConverter(config)
+
+        self.assertIs(converter.config, config)
+        self.assertIsInstance(converter.output_processor, OutputProcessor)
+        self.assertIsInstance(
+            converter.output_processor.table_converter, TableConverter
+        )
+
+    def test_notebook_converter_returns_conversion_result(self):
+        notebook = {
+            "cells": [
+                {"cell_type": "markdown", "source": ["# Heading"]},
+                {"cell_type": "code", "source": ["answer = 42"], "outputs": []},
+                {"cell_type": "raw", "source": ["ignored"]},
+            ],
+        }
+
+        result = NotebookConverter(ConversionConfig()).convert(notebook)
+
+        self.assertIsInstance(result, ConversionResult)
+        self.assertEqual(
+            result.markdown_text,
+            "# Heading\n\n```python\nanswer = 42\n```",
+        )
+        self.assertEqual(result.stats.cells_total, 3)
+        self.assertEqual(result.stats.markdown_cells, 1)
+        self.assertEqual(result.stats.code_cells, 1)
 
     def test_cell_empty_check_is_inherited(self):
         self.assertTrue(MarkdownCell(" \n").is_empty())
