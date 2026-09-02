@@ -27,25 +27,24 @@ def normalize_output_text(value):
     return None
 
 
-def has_html_output(output):
-    """Возвращает True, если у результата есть HTML-представление."""
-    data = output.get("data")
-    return isinstance(data, dict) and "text/html" in data
-
-
-def extract_text_output(output):
-    """Извлекает поддерживаемое текстовое представление результата."""
+def convert_output(output):
+    """Преобразует один поддерживаемый текстовый результат в Markdown."""
     output_type = output.get("output_type")
+    output_text = None
 
     if output_type == "stream":
-        return normalize_output_text(output.get("text"))
+        output_text = normalize_output_text(output.get("text"))
 
-    if output_type in ("execute_result", "display_data"):
+    elif output_type in ("execute_result", "display_data"):
         data = output.get("data", {})
-        if "text/plain" in data:
-            return normalize_output_text(data["text/plain"])
+        if isinstance(data, dict) and "text/plain" in data:
+            output_text = normalize_output_text(data["text/plain"])
 
-    return None
+    if output_text is None:
+        return ""
+
+    closing_separator = "" if output_text.endswith("\n") else "\n"
+    return f"```text\n{output_text}{closing_separator}```"
 
 
 def convert_markdown_cell(cell):
@@ -60,12 +59,9 @@ def convert_code_cell(cell, keep_outputs=False):
 
     if keep_outputs:
         for output in cell.get("outputs", []):
-            output_text = extract_text_output(output)
-            if output_text is not None:
-                closing_separator = "" if output_text.endswith("\n") else "\n"
-                converted_parts.append(
-                    f"```text\n{output_text}{closing_separator}```"
-                )
+            converted_output = convert_output(output)
+            if converted_output:
+                converted_parts.append(converted_output)
 
     return "\n\n".join(converted_parts)
 
