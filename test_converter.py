@@ -1,15 +1,19 @@
 import unittest  # Импортируем модуль unittest для создания и запуска тестов
 
 from cells import Cell, CodeCell, MarkdownCell
-# Импортируем тестируемые функции из модуля converter
 from converter import (
     convert_notebook,
-    convert_output,
-    convert_pandas_table,
-    is_pandas_table,
     load_notebook,
 )
 from models import ConversionResult, ConversionStats
+from outputs import (
+    convert_output,
+    convert_pandas_table,
+    is_pandas_table,
+)
+
+
+# Импортируем тестируемые функции из модуля converter
 
 
 class ConversionModelTests(unittest.TestCase):

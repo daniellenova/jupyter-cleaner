@@ -1,3 +1,7 @@
+from models import ConversionConfig, ConversionStats
+from outputs import OutputProcessor
+
+
 class Cell:
     """Базовое представление ячейки notebook'а."""
 
@@ -21,22 +25,20 @@ class MarkdownCell(Cell):
 
 
 class CodeCell(Cell):
-    """Кодовая ячейка и связанные с ней результаты выполнения."""
+    """Кодовая ячейка, делегирующая обработку результатов OutputProcessor."""
 
-    def __init__(self, source, outputs=None):
+    def __init__(self, source, outputs=None, output_processor=None):
         super().__init__(source)
         self.outputs = outputs if outputs is not None else []
+        self.output_processor = output_processor or OutputProcessor()
 
-    def convert(self, keep_outputs=False, stats=None):
+    def convert(self, config=None, stats=None):
+        config = config if config is not None else ConversionConfig()
+        stats = stats if stats is not None else ConversionStats()
         converted_parts = [f"```python\n{self.source}\n```"]
 
-        if keep_outputs:
-            # Обработка результатов пока остаётся ответственностью converter.py.
-            from converter import convert_output
-
-            for output in self.outputs:
-                converted_output = convert_output(output, stats)
-                if converted_output:
-                    converted_parts.append(converted_output)
+        converted_outputs = self.output_processor.process(self.outputs, config, stats)
+        if converted_outputs:
+            converted_parts.append(converted_outputs)
 
         return "\n\n".join(converted_parts)
