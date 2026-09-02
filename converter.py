@@ -3,6 +3,7 @@ import json  # Импортируем модуль json для работы с J
 import os  # Импортируем модуль os для получения размеров файлов
 import sys  # Импортируем модуль sys для работы с аргументами командной строки
 
+from cells import CodeCell, MarkdownCell
 from models import ConversionResult, ConversionStats
 
 
@@ -266,25 +267,6 @@ def convert_output(output, stats=None):
     return f"```text\n{output_text}{closing_separator}```"
 
 
-def convert_markdown_cell(cell):
-    """Возвращает текст Markdown-ячейки без дополнительного оформления."""
-    return "".join(cell["source"])
-
-
-def convert_code_cell(cell, keep_outputs=False, stats=None):
-    """Возвращает код ячейки и, при необходимости, её текстовые результаты."""
-    code = "".join(cell["source"])
-    converted_parts = [f"```python\n{code}\n```"]
-
-    if keep_outputs:
-        for output in cell.get("outputs", []):
-            converted_output = convert_output(output, stats)
-            if converted_output:
-                converted_parts.append(converted_output)
-
-    return "\n\n".join(converted_parts)
-
-
 def convert_notebook(notebook, keep_outputs=False):
     """Возвращает объект результата преобразования notebook'а."""
     converted_cells = []
@@ -305,16 +287,21 @@ def convert_notebook(notebook, keep_outputs=False):
                     stats.html_outputs_skipped += 1
 
         source = "".join(cell["source"])
-        if source.strip() == "":
+        if cell_type == "markdown":
+            converted_cell = MarkdownCell(source)
+        else:
+            converted_cell = CodeCell(source, cell.get("outputs", []))
+
+        if converted_cell.is_empty():
             stats.empty_cells_removed += 1
             continue
 
         if cell_type == "markdown":
             stats.markdown_cells += 1
-            converted_cells.append(convert_markdown_cell(cell))
+            converted_cells.append(converted_cell.convert())
         else:
             stats.code_cells += 1
-            converted_cells.append(convert_code_cell(cell, keep_outputs, stats))
+            converted_cells.append(converted_cell.convert(keep_outputs, stats))
 
     return ConversionResult("\n\n".join(converted_cells), stats)
 

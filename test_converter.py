@@ -1,8 +1,8 @@
 import unittest  # Импортируем модуль unittest для создания и запуска тестов
 
+from cells import Cell, CodeCell, MarkdownCell
 # Импортируем тестируемые функции из модуля converter
 from converter import (
-    convert_code_cell,
     convert_notebook,
     convert_output,
     convert_pandas_table,
@@ -10,39 +10,6 @@ from converter import (
     load_notebook,
 )
 from models import ConversionResult, ConversionStats
-
-
-class SourceOnlyCodeCell(dict):
-    """
-    Специальный класс ячейки кода для тестирования.
-    Наследуется от dict, но вызывает ошибку при попытке доступа
-    к любому полю, кроме "source".
-
-    Это позволяет проверить, что функция convert_code_cell
-    обращается ТОЛЬКО к полю "source" и не пытается читать
-    другие данные ячейки (например, "outputs", "execution_count" и т.д.)
-    """
-
-    def __getitem__(self, key):
-        """
-        Переопределяем метод доступа к элементам словаря.
-
-        Args:
-            key: Ключ, к которому пытаются получить доступ
-
-        Returns:
-            Значение по ключу, если это "source"
-
-        Raises:
-            AssertionError: Если пытаются получить доступ к любому ключу,
-                          кроме "source"
-        """
-        # Проверяем, что запрашивают именно поле "source"
-        if key != "source":
-            # Если это другое поле — вызываем ошибку с понятным сообщением
-            raise AssertionError(f"unexpected code-cell field access: {key}")
-        # Если это "source" — возвращаем значение как обычный словарь
-        return super().__getitem__(key)
 
 
 class ConversionModelTests(unittest.TestCase):
@@ -77,20 +44,23 @@ class ConverterOutputTests(unittest.TestCase):
     Наследуется от unittest.TestCase для интеграции с фреймворком тестирования.
     """
 
-    def test_code_cell_conversion_reads_only_source(self):
-        """
-        Тест проверяет, что функция convert_code_cell читает только поле "source"
-        из ячейки кода и не обращается к другим полям.
+    def test_cell_classes_convert_their_own_source(self):
+        markdown = MarkdownCell("# Заголовок\n")
+        code = CodeCell("print('hello')")
 
-        Создаём специальную ячейку, которая "взорвётся" (вызовет ошибку),
-        если кто-то попытается прочитать любое поле, кроме "source".
-        """
-        # Создаём тестовую ячейку с исходным кодом
-        cell = SourceOnlyCodeCell(source=["print('hello')"])
+        self.assertIsInstance(markdown, Cell)
+        self.assertIsInstance(code, Cell)
+        self.assertEqual(markdown.convert(), "# Заголовок\n")
+        self.assertEqual(code.convert(), "```python\nprint('hello')\n```")
 
-        # Проверяем, что результат конвертации соответствует ожидаемому
-        # Если функция попытается прочитать другие поля — тест упадёт с ошибкой
-        self.assertEqual(convert_code_cell(cell), "```python\nprint('hello')\n```")
+    def test_cell_empty_check_is_inherited(self):
+        self.assertTrue(MarkdownCell(" \n").is_empty())
+        self.assertTrue(CodeCell("").is_empty())
+        self.assertFalse(CodeCell("pass").is_empty())
+
+    def test_base_cell_does_not_implement_conversion(self):
+        with self.assertRaises(NotImplementedError):
+            Cell("text").convert()
 
     def test_example_outputs_are_ignored(self):
         """
