@@ -233,7 +233,7 @@ def convert_pandas_table(html_text):
     return "\n".join(markdown_rows)
 
 
-def convert_output(output):
+def convert_output(output, stats=None):
     """Преобразует один поддерживаемый текстовый результат в Markdown."""
     output_type = output.get("output_type")
     output_text = None
@@ -248,6 +248,8 @@ def convert_output(output):
             if html_text is not None:
                 markdown_table = convert_pandas_table(html_text)
                 if markdown_table is not None:
+                    if stats is not None:
+                        stats["tables_converted"] += 1
                     return markdown_table
             if "text/plain" in data:
                 output_text = normalize_output_text(data["text/plain"])
@@ -255,6 +257,8 @@ def convert_output(output):
     if output_text is None:
         return ""
 
+    if stats is not None:
+        stats["text_outputs_kept"] += 1
     closing_separator = "" if output_text.endswith("\n") else "\n"
     return f"```text\n{output_text}{closing_separator}```"
 
@@ -264,14 +268,14 @@ def convert_markdown_cell(cell):
     return "".join(cell["source"])
 
 
-def convert_code_cell(cell, keep_outputs=False):
+def convert_code_cell(cell, keep_outputs=False, stats=None):
     """Возвращает код ячейки и, при необходимости, её текстовые результаты."""
     code = "".join(cell["source"])
     converted_parts = [f"```python\n{code}\n```"]
 
     if keep_outputs:
         for output in cell.get("outputs", []):
-            converted_output = convert_output(output)
+            converted_output = convert_output(output, stats)
             if converted_output:
                 converted_parts.append(converted_output)
 
@@ -279,24 +283,58 @@ def convert_code_cell(cell, keep_outputs=False):
 
 
 def convert_notebook(notebook, keep_outputs=False):
-    """Преобразует поддерживаемые ячейки notebook'а в одну Markdown-строку."""
+    """Возвращает Markdown и словарь статистики преобразования notebook'а."""
     converted_cells = []
+    cells = notebook["cells"]
+    stats = {
+        "cells_total": len(cells),
+        "code_cells": 0,
+        "markdown_cells": 0,
+        "empty_cells_removed": 0,
+        "outputs_total": 0,
+        "text_outputs_kept": 0,
+        "html_outputs_skipped": 0,
+        "tables_converted": 0,
+    }
 
-    for cell in notebook["cells"]:
+    for cell in cells:
         cell_type = cell["cell_type"]
         if cell_type not in ("markdown", "code"):
             continue
 
+        if cell_type == "code":
+            outputs = cell.get("outputs", [])
+            stats["outputs_total"] += len(outputs)
+            for output in outputs:
+                data = output.get("data", {})
+                if isinstance(data, dict) and "text/html" in data:
+                    stats["html_outputs_skipped"] += 1
+
         source = "".join(cell["source"])
         if source.strip() == "":
+            stats["empty_cells_removed"] += 1
             continue
 
         if cell_type == "markdown":
+            stats["markdown_cells"] += 1
             converted_cells.append(convert_markdown_cell(cell))
         else:
-            converted_cells.append(convert_code_cell(cell, keep_outputs))
+            stats["code_cells"] += 1
+            converted_cells.append(convert_code_cell(cell, keep_outputs, stats))
 
-    return "\n\n".join(converted_cells)
+    return "\n\n".join(converted_cells), stats
+
+
+def print_stats(stats):
+    """Печатает понятную пользователю сводку преобразования."""
+    print(f"Обработано ячеек: {stats['cells_total']}")
+    print(f"Кодовых: {stats['code_cells']}")
+    print(f"Текстовых: {stats['markdown_cells']}")
+    print(f"Удалено пустых: {stats['empty_cells_removed']}")
+    print(f"Всего результатов выполнения: {stats['outputs_total']}")
+    print(f"Сохранено текстовых результатов: {stats['text_outputs_kept']}")
+    print(f"HTML-представлений исключено: {stats['html_outputs_skipped']}")
+    print(f"Преобразовано таблиц: {stats['tables_converted']}")
 
 
 def get_output_path(input_path):
@@ -341,11 +379,12 @@ def main():
         return
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
-    markdown_text = convert_notebook(notebook, keep_outputs)
+    markdown_text, stats = convert_notebook(notebook, keep_outputs)
     output_path = get_output_path(file_path)
     save_markdown(markdown_text, output_path)
 
     print(f"Создан файл: {output_path}")
+    print_stats(stats)
 
 
 # Проверяем, запущен ли скрипт напрямую (а не импортирован как модуль)
