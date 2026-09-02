@@ -18,10 +18,15 @@ def load_notebook(file_path):
         return json.load(file)
 
 
+def convert_markdown_cell(cell):
+    """Возвращает текст Markdown-ячейки без дополнительного оформления."""
+    return "".join(cell["source"])
+
+
 def main():
     """
     Главная функция программы.
-    Проверяет аргументы командной строки и выводит количество ячеек в notebook'е.
+    Проверяет аргументы командной строки и выводит первую Markdown-ячейку.
     """
     # Проверяем, передан ли путь к файлу в аргументах командной строки
     if len(sys.argv) < 2:
@@ -35,11 +40,13 @@ def main():
     # Загружаем notebook из файла
     notebook = load_notebook(file_path)
 
-    # Извлекаем список ячеек из notebook'а
-    cells = notebook["cells"]
+    # Находим первую Markdown-ячейку в notebook'е
+    markdown_cell = next(
+        cell for cell in notebook["cells"] if cell["cell_type"] == "markdown"
+    )
 
-    # Выводим количество ячеек в notebook'е
-    print(len(cells))
+    # Выводим текст Markdown-ячейки без дополнительного оформления
+    print(convert_markdown_cell(markdown_cell))
 
 
 # Проверяем, запущен ли скрипт напрямую (а не импортирован как модуль)
