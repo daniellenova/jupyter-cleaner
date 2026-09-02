@@ -1,4 +1,5 @@
-from models import ConversionConfig, ConversionStats
+from config import ConversionConfig
+from models import ConversionStats
 from outputs import OutputProcessor
 
 

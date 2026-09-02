@@ -1,5 +1,6 @@
 """Преобразование результатов выполнения Jupyter в Markdown."""
 
+from config import ConversionConfig
 from tables import TableConverter
 
 
@@ -45,11 +46,13 @@ def _format_text_output(output_text):
     return f"```text\n{output_text}{closing_separator}```"
 
 
-def convert_output(output, stats=None, table_converter=None):
+def convert_output(output, config=None, stats=None, table_converter=None):
     """Преобразует один поддерживаемый результат выполнения в Markdown."""
+    config = config if config is not None else ConversionConfig()
     html_text = extract_html_output(output)
     table_converter = table_converter or TableConverter()
-    if html_text is not None and table_converter.is_supported(html_text):
+    if (config.convert_tables and html_text is not None
+            and table_converter.is_supported(html_text)):
         table = table_converter.convert(html_text)
         if table is not None:
             if stats is not None:
@@ -70,13 +73,18 @@ class OutputProcessor:
     def __init__(self, table_converter=None):
         self.table_converter = table_converter or TableConverter()
 
-    def process(self, outputs, config, stats):
-        """Обрабатывает список outputs и обновляет только связанную статистику."""
+    @staticmethod
+    def count_outputs(outputs, stats):
+        """Учитывает найденные outputs без их преобразования."""
         stats.outputs_total += len(outputs)
         stats.html_outputs_skipped += sum(has_html_output(output) for output in outputs)
+
+    def process(self, outputs, config, stats):
+        """Обрабатывает список outputs и обновляет только связанную статистику."""
+        self.count_outputs(outputs, stats)
         if not config.keep_outputs:
             return ""
 
-        converted = [convert_output(output, stats, self.table_converter)
+        converted = [convert_output(output, config, stats, self.table_converter)
                      for output in outputs]
         return "\n\n".join(part for part in converted if part)

@@ -3,7 +3,8 @@ import os  # Импортируем модуль os для получения р
 import sys  # Импортируем модуль sys для работы с аргументами командной строки
 
 from cells import CodeCell, MarkdownCell
-from models import ConversionConfig, ConversionResult, ConversionStats
+from config import ConversionConfig
+from models import ConversionResult, ConversionStats
 
 
 def load_notebook(file_path):
@@ -22,12 +23,12 @@ def load_notebook(file_path):
         return json.load(file)
 
 
-def convert_notebook(notebook, keep_outputs=False):
+def convert_notebook(notebook, config=None):
     """Возвращает объект результата преобразования notebook'а."""
+    config = config if config is not None else ConversionConfig()
     converted_cells = []
     cells = notebook["cells"]
     stats = ConversionStats(cells_total=len(cells))
-    config = ConversionConfig(keep_outputs=keep_outputs)
 
     for cell in cells:
         cell_type = cell["cell_type"]
@@ -40,9 +41,11 @@ def convert_notebook(notebook, keep_outputs=False):
         else:
             converted_cell = CodeCell(source, cell.get("outputs", []))
 
-        if converted_cell.is_empty():
+        if converted_cell.is_empty() and config.remove_empty_cells:
             if cell_type == "code":
-                converted_cell.convert(ConversionConfig(), stats)
+                converted_cell.output_processor.count_outputs(
+                    converted_cell.outputs, stats
+                )
             stats.empty_cells_removed += 1
             continue
 
@@ -137,7 +140,7 @@ def main():
 
     # Получаем путь к файлу из первого аргумента командной строки
     file_path = sys.argv[1]
-    keep_outputs = len(sys.argv) == 3
+    config = ConversionConfig(keep_outputs=len(sys.argv) == 3)
 
     # Загружаем notebook из файла и сообщаем об ожидаемых ошибках ввода
     try:
@@ -151,7 +154,7 @@ def main():
         return
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
-    result = convert_notebook(notebook, keep_outputs)
+    result = convert_notebook(notebook, config)
     output_path = get_output_path(file_path)
     save_markdown(result.markdown_text, output_path)
     output_size = os.path.getsize(output_path)

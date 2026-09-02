@@ -1,13 +1,6 @@
 from dataclasses import dataclass, field
 
 
-@dataclass(frozen=True)
-class ConversionConfig:
-    """Настройки одного преобразования notebook в Markdown."""
-
-    keep_outputs: bool = False
-
-
 @dataclass
 class ConversionStats:
     """Статистика одного преобразования notebook в Markdown."""

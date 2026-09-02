@@ -1,11 +1,13 @@
 import unittest  # Импортируем модуль unittest для создания и запуска тестов
+from dataclasses import FrozenInstanceError
 
 from cells import Cell, CodeCell, MarkdownCell
+from config import ConversionConfig
 from converter import (
     convert_notebook,
     load_notebook,
 )
-from models import ConversionConfig, ConversionResult, ConversionStats
+from models import ConversionResult, ConversionStats
 from outputs import OutputProcessor, convert_output
 from tables import TableConverter
 
@@ -38,6 +40,15 @@ class ConversionModelTests(unittest.TestCase):
         self.assertIsInstance(first.stats, ConversionStats)
         self.assertIsNot(first.stats, second.stats)
 
+    def test_config_has_current_defaults_and_is_immutable(self):
+        config = ConversionConfig()
+
+        self.assertFalse(config.keep_outputs)
+        self.assertTrue(config.remove_empty_cells)
+        self.assertTrue(config.convert_tables)
+        with self.assertRaises(FrozenInstanceError):
+            config.keep_outputs = True
+
 
 class ConverterOutputTests(unittest.TestCase):
     """
@@ -58,6 +69,23 @@ class ConverterOutputTests(unittest.TestCase):
         self.assertTrue(MarkdownCell(" \n").is_empty())
         self.assertTrue(CodeCell("").is_empty())
         self.assertFalse(CodeCell("pass").is_empty())
+
+    def test_empty_cells_can_be_preserved_by_config(self):
+        notebook = {
+            "cells": [
+                {"cell_type": "markdown", "source": [" "]},
+                {"cell_type": "code", "source": [], "outputs": []},
+            ],
+        }
+
+        result = convert_notebook(
+            notebook, ConversionConfig(remove_empty_cells=False)
+        )
+
+        self.assertIn("```python\n\n```", result.markdown_text)
+        self.assertEqual(result.stats.empty_cells_removed, 0)
+        self.assertEqual(result.stats.markdown_cells, 1)
+        self.assertEqual(result.stats.code_cells, 1)
 
     def test_base_cell_does_not_implement_conversion(self):
         with self.assertRaises(NotImplementedError):
@@ -132,7 +160,7 @@ class ConversionStatsTests(unittest.TestCase):
     def test_stats_with_outputs(self):
         notebook = load_notebook("examples/table.ipynb")
 
-        result = convert_notebook(notebook, keep_outputs=True)
+        result = convert_notebook(notebook, ConversionConfig(keep_outputs=True))
         markdown = result.markdown_text
         stats = result.stats
 
@@ -158,7 +186,7 @@ class ConversionStatsTests(unittest.TestCase):
             ],
         }
 
-        result = convert_notebook(notebook, keep_outputs=True)
+        result = convert_notebook(notebook, ConversionConfig(keep_outputs=True))
         markdown = result.markdown_text
         stats = result.stats
 
@@ -248,6 +276,17 @@ Bob | team </td></tr></tbody>
 
         self.assertFalse(TableConverter().is_supported(output["data"]["text/html"]))
         self.assertEqual(convert_output(output), "```text\nsafe fallback\n```")
+
+    def test_table_conversion_can_be_disabled_by_config(self):
+        notebook = load_notebook("examples/table.ipynb")
+        output = notebook["cells"][1]["outputs"][0]
+
+        converted = convert_output(
+            output, ConversionConfig(keep_outputs=True, convert_tables=False)
+        )
+
+        self.assertNotIn("| 0 | 25 | 50000 |", converted)
+        self.assertIn("age  salary", converted)
 
     def test_rejects_arbitrary_content_around_table(self):
         """Разрешённая обёртка не превращает парсер в обработчик любого HTML."""
