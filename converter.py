@@ -18,6 +18,30 @@ def load_notebook(file_path):
         return json.load(file)
 
 
+def normalize_output_text(value):
+    """Приводит строку или список строк результата к одной строке."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(value)
+    return None
+
+
+def extract_text_output(output):
+    """Извлекает поддерживаемое текстовое представление результата."""
+    output_type = output.get("output_type")
+
+    if output_type == "stream":
+        return normalize_output_text(output.get("text"))
+
+    if output_type in ("execute_result", "display_data"):
+        data = output.get("data", {})
+        if "text/plain" in data:
+            return normalize_output_text(data["text/plain"])
+
+    return None
+
+
 def convert_markdown_cell(cell):
     """Возвращает текст Markdown-ячейки без дополнительного оформления."""
     return "".join(cell["source"])
