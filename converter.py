@@ -27,6 +27,12 @@ def normalize_output_text(value):
     return None
 
 
+def has_html_output(output):
+    """Возвращает True, если у результата есть HTML-представление."""
+    data = output.get("data")
+    return isinstance(data, dict) and "text/html" in data
+
+
 def extract_text_output(output):
     """Извлекает поддерживаемое текстовое представление результата."""
     output_type = output.get("output_type")
