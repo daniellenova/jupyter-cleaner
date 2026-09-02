@@ -283,9 +283,17 @@ def convert_notebook(notebook, keep_outputs=False):
     converted_cells = []
 
     for cell in notebook["cells"]:
-        if cell["cell_type"] == "markdown":
+        cell_type = cell["cell_type"]
+        if cell_type not in ("markdown", "code"):
+            continue
+
+        source = "".join(cell["source"])
+        if source.strip() == "":
+            continue
+
+        if cell_type == "markdown":
             converted_cells.append(convert_markdown_cell(cell))
-        elif cell["cell_type"] == "code":
+        else:
             converted_cells.append(convert_code_cell(cell, keep_outputs))
 
     return "\n\n".join(converted_cells)
