@@ -9,6 +9,7 @@ from converter import (
     is_pandas_table,
     load_notebook,
 )
+from models import ConversionResult, ConversionStats
 
 
 class SourceOnlyCodeCell(dict):
@@ -42,6 +43,32 @@ class SourceOnlyCodeCell(dict):
             raise AssertionError(f"unexpected code-cell field access: {key}")
         # Если это "source" — возвращаем значение как обычный словарь
         return super().__getitem__(key)
+
+
+class ConversionModelTests(unittest.TestCase):
+    """Проверяет начальное состояние объектов результата и статистики."""
+
+    def test_stats_have_zero_defaults(self):
+        stats = ConversionStats()
+
+        self.assertEqual(stats.cells_total, 0)
+        self.assertEqual(stats.code_cells, 0)
+        self.assertEqual(stats.markdown_cells, 0)
+        self.assertEqual(stats.empty_cells_removed, 0)
+        self.assertEqual(stats.outputs_total, 0)
+        self.assertEqual(stats.text_outputs_kept, 0)
+        self.assertEqual(stats.html_outputs_skipped, 0)
+        self.assertEqual(stats.tables_converted, 0)
+        self.assertEqual(stats.input_size_bytes, 0)
+        self.assertEqual(stats.output_size_bytes, 0)
+        self.assertEqual(stats.size_reduction_percent, 0.0)
+
+    def test_result_owns_independent_default_stats(self):
+        first = ConversionResult("first")
+        second = ConversionResult("second")
+
+        self.assertIsInstance(first.stats, ConversionStats)
+        self.assertIsNot(first.stats, second.stats)
 
 
 class ConverterOutputTests(unittest.TestCase):
@@ -101,11 +128,11 @@ class ConverterOutputTests(unittest.TestCase):
             # subTest позволяет увидеть, какой именно notebook упал в тесте
             with self.subTest(notebook=notebook_path):
                 # Загружаем notebook и конвертируем его в Markdown
-                markdown, stats = convert_notebook(load_notebook(notebook_path))
+                result = convert_notebook(load_notebook(notebook_path))
 
                 # Проверяем, что ни одна из "запрещённых" строк не появилась
                 for forbidden_value in forbidden_values:
-                    self.assertNotIn(forbidden_value, markdown)
+                    self.assertNotIn(forbidden_value, result.markdown_text)
 
 
 class ConversionStatsTests(unittest.TestCase):
@@ -114,30 +141,36 @@ class ConversionStatsTests(unittest.TestCase):
     def test_stats_without_outputs(self):
         notebook = load_notebook("examples/table.ipynb")
 
-        markdown, stats = convert_notebook(notebook)
+        result = convert_notebook(notebook)
+        markdown = result.markdown_text
+        stats = result.stats
 
         self.assertNotIn("| 0 | 25 | 50000 |", markdown)
-        self.assertEqual(stats["cells_total"], len(notebook["cells"]))
+        self.assertIsInstance(result, ConversionResult)
+        self.assertIsInstance(stats, ConversionStats)
+        self.assertEqual(stats.cells_total, len(notebook["cells"]))
         self.assertEqual(
-            stats["outputs_total"],
+            stats.outputs_total,
             sum(len(cell.get("outputs", [])) for cell in notebook["cells"]
                 if cell["cell_type"] == "code"),
         )
-        self.assertEqual(stats["text_outputs_kept"], 0)
-        self.assertEqual(stats["tables_converted"], 0)
-        self.assertEqual(stats["html_outputs_skipped"], 1)
+        self.assertEqual(stats.text_outputs_kept, 0)
+        self.assertEqual(stats.tables_converted, 0)
+        self.assertEqual(stats.html_outputs_skipped, 1)
 
     def test_stats_with_outputs(self):
         notebook = load_notebook("examples/table.ipynb")
 
-        markdown, stats = convert_notebook(notebook, keep_outputs=True)
+        result = convert_notebook(notebook, keep_outputs=True)
+        markdown = result.markdown_text
+        stats = result.stats
 
         self.assertIn("| 0 | 25 | 50000 |", markdown)
-        self.assertEqual(stats["cells_total"], len(notebook["cells"]))
-        self.assertEqual(stats["outputs_total"], 1)
-        self.assertEqual(stats["text_outputs_kept"], 0)
-        self.assertEqual(stats["tables_converted"], 1)
-        self.assertEqual(stats["html_outputs_skipped"], 1)
+        self.assertEqual(stats.cells_total, len(notebook["cells"]))
+        self.assertEqual(stats.outputs_total, 1)
+        self.assertEqual(stats.text_outputs_kept, 0)
+        self.assertEqual(stats.tables_converted, 1)
+        self.assertEqual(stats.html_outputs_skipped, 1)
 
     def test_counts_empty_cells_and_plain_outputs(self):
         notebook = {
@@ -154,19 +187,19 @@ class ConversionStatsTests(unittest.TestCase):
             ],
         }
 
-        markdown, stats = convert_notebook(notebook, keep_outputs=True)
+        result = convert_notebook(notebook, keep_outputs=True)
+        markdown = result.markdown_text
+        stats = result.stats
 
         self.assertIn("```text\n1\n```", markdown)
-        self.assertEqual(stats, {
-            "cells_total": 5,
-            "code_cells": 1,
-            "markdown_cells": 1,
-            "empty_cells_removed": 2,
-            "outputs_total": 2,
-            "text_outputs_kept": 1,
-            "html_outputs_skipped": 0,
-            "tables_converted": 0,
-        })
+        self.assertEqual(stats, ConversionStats(
+            cells_total=5,
+            code_cells=1,
+            markdown_cells=1,
+            empty_cells_removed=2,
+            outputs_total=2,
+            text_outputs_kept=1,
+        ))
 
     def test_converts_supported_pandas_table(self):
         """Поддерживаемая таблица превращается в Markdown без дублирования."""

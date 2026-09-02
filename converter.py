@@ -3,6 +3,8 @@ import json  # Импортируем модуль json для работы с J
 import os  # Импортируем модуль os для получения размеров файлов
 import sys  # Импортируем модуль sys для работы с аргументами командной строки
 
+from models import ConversionResult, ConversionStats
+
 
 def load_notebook(file_path):
     """
@@ -250,7 +252,7 @@ def convert_output(output, stats=None):
                 markdown_table = convert_pandas_table(html_text)
                 if markdown_table is not None:
                     if stats is not None:
-                        stats["tables_converted"] += 1
+                        stats.tables_converted += 1
                     return markdown_table
             if "text/plain" in data:
                 output_text = normalize_output_text(data["text/plain"])
@@ -259,7 +261,7 @@ def convert_output(output, stats=None):
         return ""
 
     if stats is not None:
-        stats["text_outputs_kept"] += 1
+        stats.text_outputs_kept += 1
     closing_separator = "" if output_text.endswith("\n") else "\n"
     return f"```text\n{output_text}{closing_separator}```"
 
@@ -284,19 +286,10 @@ def convert_code_cell(cell, keep_outputs=False, stats=None):
 
 
 def convert_notebook(notebook, keep_outputs=False):
-    """Возвращает Markdown и словарь статистики преобразования notebook'а."""
+    """Возвращает объект результата преобразования notebook'а."""
     converted_cells = []
     cells = notebook["cells"]
-    stats = {
-        "cells_total": len(cells),
-        "code_cells": 0,
-        "markdown_cells": 0,
-        "empty_cells_removed": 0,
-        "outputs_total": 0,
-        "text_outputs_kept": 0,
-        "html_outputs_skipped": 0,
-        "tables_converted": 0,
-    }
+    stats = ConversionStats(cells_total=len(cells))
 
     for cell in cells:
         cell_type = cell["cell_type"]
@@ -305,37 +298,37 @@ def convert_notebook(notebook, keep_outputs=False):
 
         if cell_type == "code":
             outputs = cell.get("outputs", [])
-            stats["outputs_total"] += len(outputs)
+            stats.outputs_total += len(outputs)
             for output in outputs:
                 data = output.get("data", {})
                 if isinstance(data, dict) and "text/html" in data:
-                    stats["html_outputs_skipped"] += 1
+                    stats.html_outputs_skipped += 1
 
         source = "".join(cell["source"])
         if source.strip() == "":
-            stats["empty_cells_removed"] += 1
+            stats.empty_cells_removed += 1
             continue
 
         if cell_type == "markdown":
-            stats["markdown_cells"] += 1
+            stats.markdown_cells += 1
             converted_cells.append(convert_markdown_cell(cell))
         else:
-            stats["code_cells"] += 1
+            stats.code_cells += 1
             converted_cells.append(convert_code_cell(cell, keep_outputs, stats))
 
-    return "\n\n".join(converted_cells), stats
+    return ConversionResult("\n\n".join(converted_cells), stats)
 
 
 def print_stats(stats):
     """Печатает понятную пользователю сводку преобразования."""
-    print(f"Обработано ячеек: {stats['cells_total']}")
-    print(f"Кодовых: {stats['code_cells']}")
-    print(f"Текстовых: {stats['markdown_cells']}")
-    print(f"Удалено пустых: {stats['empty_cells_removed']}")
-    print(f"Всего результатов выполнения: {stats['outputs_total']}")
-    print(f"Сохранено текстовых результатов: {stats['text_outputs_kept']}")
-    print(f"HTML-представлений исключено: {stats['html_outputs_skipped']}")
-    print(f"Преобразовано таблиц: {stats['tables_converted']}")
+    print(f"Обработано ячеек: {stats.cells_total}")
+    print(f"Кодовых: {stats.code_cells}")
+    print(f"Текстовых: {stats.markdown_cells}")
+    print(f"Удалено пустых: {stats.empty_cells_removed}")
+    print(f"Всего результатов выполнения: {stats.outputs_total}")
+    print(f"Сохранено текстовых результатов: {stats.text_outputs_kept}")
+    print(f"HTML-представлений исключено: {stats.html_outputs_skipped}")
+    print(f"Преобразовано таблиц: {stats.tables_converted}")
 
 
 def get_output_path(input_path):
@@ -366,9 +359,9 @@ def format_file_size(size_bytes):
 
 def add_file_size_stats(stats, input_size, output_size):
     """Добавляет размеры файлов и процент их изменения в статистику."""
-    stats["input_size_bytes"] = input_size
-    stats["output_size_bytes"] = output_size
-    stats["size_reduction_percent"] = (
+    stats.input_size_bytes = input_size
+    stats.output_size_bytes = output_size
+    stats.size_reduction_percent = (
         (input_size - output_size) / input_size * 100
         if input_size else 0.0
     )
@@ -376,9 +369,9 @@ def add_file_size_stats(stats, input_size, output_size):
 
 def print_file_size_stats(stats):
     """Печатает размеры исходного и итогового файлов и их изменение."""
-    input_size = stats["input_size_bytes"]
-    output_size = stats["output_size_bytes"]
-    reduction = stats["size_reduction_percent"]
+    input_size = stats.input_size_bytes
+    output_size = stats.output_size_bytes
+    reduction = stats.size_reduction_percent
 
     print("Размер:")
     print(f"{format_file_size(input_size)} → {format_file_size(output_size)}")
@@ -421,15 +414,15 @@ def main():
         return
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
-    markdown_text, stats = convert_notebook(notebook, keep_outputs)
+    result = convert_notebook(notebook, keep_outputs)
     output_path = get_output_path(file_path)
-    save_markdown(markdown_text, output_path)
+    save_markdown(result.markdown_text, output_path)
     output_size = os.path.getsize(output_path)
-    add_file_size_stats(stats, input_size, output_size)
+    add_file_size_stats(result.stats, input_size, output_size)
 
     print(f"Создан файл: {output_path}")
-    print_stats(stats)
-    print_file_size_stats(stats)
+    print_stats(result.stats)
+    print_file_size_stats(result.stats)
 
 
 # Проверяем, запущен ли скрипт напрямую (а не импортирован как модуль)
