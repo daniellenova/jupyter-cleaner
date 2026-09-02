@@ -1,5 +1,6 @@
 import html  # Импортируем стандартный модуль для декодирования HTML-сущностей
 import json  # Импортируем модуль json для работы с JSON-файлами
+import os  # Импортируем модуль os для получения размеров файлов
 import sys  # Импортируем модуль sys для работы с аргументами командной строки
 
 
@@ -348,6 +349,46 @@ def save_markdown(markdown_text, output_path):
         file.write(markdown_text)
 
 
+def format_file_size(size_bytes):
+    """Возвращает размер файла в удобочитаемом виде (Б, КБ или МБ)."""
+    if size_bytes < 1024:
+        return f"{size_bytes} Б"
+
+    size_kilobytes = size_bytes / 1024
+    if size_kilobytes < 1024:
+        value = f"{size_kilobytes:.1f}".rstrip("0").rstrip(".")
+        return f"{value} КБ"
+
+    size_megabytes = size_kilobytes / 1024
+    value = f"{size_megabytes:.1f}".rstrip("0").rstrip(".")
+    return f"{value} МБ"
+
+
+def add_file_size_stats(stats, input_size, output_size):
+    """Добавляет размеры файлов и процент их изменения в статистику."""
+    stats["input_size_bytes"] = input_size
+    stats["output_size_bytes"] = output_size
+    stats["size_reduction_percent"] = (
+        (input_size - output_size) / input_size * 100
+        if input_size else 0.0
+    )
+
+
+def print_file_size_stats(stats):
+    """Печатает размеры исходного и итогового файлов и их изменение."""
+    input_size = stats["input_size_bytes"]
+    output_size = stats["output_size_bytes"]
+    reduction = stats["size_reduction_percent"]
+
+    print("Размер:")
+    print(f"{format_file_size(input_size)} → {format_file_size(output_size)}")
+    if reduction >= 0:
+        print(f"Уменьшение: {reduction:.1f} %")
+    else:
+        change = (output_size - input_size) / input_size * 100 if input_size else 0.0
+        print(f"Изменение размера: +{change:.1f} %")
+
+
 def main():
     """
     Главная функция программы.
@@ -370,6 +411,7 @@ def main():
 
     # Загружаем notebook из файла и сообщаем об ожидаемых ошибках ввода
     try:
+        input_size = os.path.getsize(file_path)
         notebook = load_notebook(file_path)
     except FileNotFoundError:
         print(f"Ошибка: файл '{file_path}' не найден.")
@@ -382,9 +424,12 @@ def main():
     markdown_text, stats = convert_notebook(notebook, keep_outputs)
     output_path = get_output_path(file_path)
     save_markdown(markdown_text, output_path)
+    output_size = os.path.getsize(output_path)
+    add_file_size_stats(stats, input_size, output_size)
 
     print(f"Создан файл: {output_path}")
     print_stats(stats)
+    print_file_size_stats(stats)
 
 
 # Проверяем, запущен ли скрипт напрямую (а не импортирован как модуль)
