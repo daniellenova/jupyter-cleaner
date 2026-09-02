@@ -47,13 +47,24 @@ def convert_markdown_cell(cell):
     return "".join(cell["source"])
 
 
-def convert_code_cell(cell):
-    """Возвращает код ячейки в виде блока Python для Markdown."""
+def convert_code_cell(cell, keep_outputs=False):
+    """Возвращает код ячейки и, при необходимости, её текстовые результаты."""
     code = "".join(cell["source"])
-    return f"```python\n{code}\n```"
+    converted_parts = [f"```python\n{code}\n```"]
+
+    if keep_outputs:
+        for output in cell.get("outputs", []):
+            output_text = extract_text_output(output)
+            if output_text is not None:
+                closing_separator = "" if output_text.endswith("\n") else "\n"
+                converted_parts.append(
+                    f"```text\n{output_text}{closing_separator}```"
+                )
+
+    return "\n\n".join(converted_parts)
 
 
-def convert_notebook(notebook):
+def convert_notebook(notebook, keep_outputs=False):
     """Преобразует поддерживаемые ячейки notebook'а в одну Markdown-строку."""
     converted_cells = []
 
@@ -61,7 +72,7 @@ def convert_notebook(notebook):
         if cell["cell_type"] == "markdown":
             converted_cells.append(convert_markdown_cell(cell))
         elif cell["cell_type"] == "code":
-            converted_cells.append(convert_code_cell(cell))
+            converted_cells.append(convert_code_cell(cell, keep_outputs))
 
     return "\n\n".join(converted_cells)
 
@@ -85,11 +96,17 @@ def main():
     # Проверяем, передан ли путь к файлу в аргументах командной строки
     if len(sys.argv) < 2:
         # Если аргументов недостаточно, выводим инструкцию по использованию
-        print("Использование: python converter.py <notebook.ipynb>")
+        print("Использование: python converter.py <notebook.ipynb> [--keep-outputs]")
+        return
+
+    if len(sys.argv) > 3 or (len(sys.argv) == 3 and sys.argv[2] != "--keep-outputs"):
+        print("Ошибка: поддерживается только дополнительный флаг --keep-outputs.")
+        print("Использование: python converter.py <notebook.ipynb> [--keep-outputs]")
         return
 
     # Получаем путь к файлу из первого аргумента командной строки
     file_path = sys.argv[1]
+    keep_outputs = len(sys.argv) == 3
 
     # Загружаем notebook из файла и сообщаем об ожидаемых ошибках ввода
     try:
@@ -102,7 +119,7 @@ def main():
         return
 
     # Преобразуем notebook, определяем путь результата и сохраняем Markdown
-    markdown_text = convert_notebook(notebook)
+    markdown_text = convert_notebook(notebook, keep_outputs)
     output_path = get_output_path(file_path)
     save_markdown(markdown_text, output_path)
 
