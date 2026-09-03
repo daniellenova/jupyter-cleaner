@@ -5,7 +5,10 @@ from json import JSONDecodeError
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from typer.testing import CliRunner
+
 from jupyter_cleaner.cells import Cell, CodeCell, MarkdownCell
+from jupyter_cleaner.cli import app
 from jupyter_cleaner.config import ConversionConfig
 from jupyter_cleaner.converter import (
     NotebookConverter,
@@ -45,6 +48,47 @@ class NotebookLoadingTests(unittest.TestCase):
 
         self.assertIsInstance(context.exception, NotebookError)
         self.assertIsInstance(context.exception.__cause__, JSONDecodeError)
+
+
+class ConvertCommandTests(unittest.TestCase):
+    """Проверяет основной пользовательский сценарий ``convert FILE``."""
+
+    def setUp(self):
+        self.runner = CliRunner()
+
+    def test_convert_writes_markdown_next_to_notebook(self):
+        with TemporaryDirectory() as directory:
+            notebook_path = Path(directory) / "sample.ipynb"
+            notebook_path.write_text(
+                '{"cells": [{"cell_type": "markdown", "source": ["# Test"]}]}',
+                encoding="utf-8",
+            )
+
+            result = self.runner.invoke(app, ["convert", str(notebook_path)])
+
+            output_path = notebook_path.with_suffix(".md")
+            self.assertEqual(result.exit_code, 0)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "# Test")
+            self.assertIn(f"Создан файл: {output_path}", result.stdout)
+            self.assertIn("Обработано ячеек: 1", result.stdout)
+
+    def test_convert_reports_missing_file_without_traceback(self):
+        result = self.runner.invoke(app, ["convert", "definitely_missing.ipynb"])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("не найден", result.output)
+        self.assertNotIn("Traceback", result.output)
+
+    def test_convert_reports_invalid_json_without_traceback(self):
+        with TemporaryDirectory() as directory:
+            notebook_path = Path(directory) / "broken.ipynb"
+            notebook_path.write_text("{broken", encoding="utf-8")
+
+            result = self.runner.invoke(app, ["convert", str(notebook_path)])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("некорректный JSON", result.output)
+        self.assertNotIn("Traceback", result.output)
 
 
 class ConversionModelTests(unittest.TestCase):

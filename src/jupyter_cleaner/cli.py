@@ -65,9 +65,9 @@ def print_file_size_stats(stats: ConversionStats) -> None:
         typer.echo(f"Изменение размера: {-stats.size_reduction_percent:+.1f} %")
 
 
-@app.callback(invoke_without_command=True)
-def main(
-        input_path: Annotated[
+@app.command()
+def convert(
+        file: Annotated[
             Path,
             typer.Argument(
                 help="Путь к исходному notebook (.ipynb).",
@@ -75,32 +75,23 @@ def main(
                 dir_okay=False,
             ),
         ],
-        keep_outputs: Annotated[
-            bool,
-            typer.Option(
-                "--keep-outputs",
-                help="Сохранять текстовые результаты выполнения и таблицы.",
-            ),
-        ] = False,
 ) -> None:
     """Преобразует один notebook в Markdown-файл рядом с исходным."""
     try:
-        notebook = load_notebook(input_path)
+        notebook = load_notebook(file)
     except NotebookNotFoundError:
-        typer.echo(f"Ошибка: файл '{input_path}' не найден.", err=True)
+        typer.echo(f"Ошибка: файл '{file}' не найден.", err=True)
         raise typer.Exit(code=1) from None
     except InvalidNotebookError:
         typer.echo(
-            f"Ошибка: файл '{input_path}' содержит некорректный JSON.",
+            f"Ошибка: файл '{file}' содержит некорректный JSON.",
             err=True,
         )
         raise typer.Exit(code=1) from None
 
-    input_size = input_path.stat().st_size
-    result = NotebookConverter(ConversionConfig(keep_outputs=keep_outputs)).convert(
-        notebook
-    )
-    output_path = input_path.with_suffix(".md")
+    input_size = file.stat().st_size
+    result = NotebookConverter(ConversionConfig()).convert(notebook)
+    output_path = file.with_suffix(".md")
     output_path.write_text(result.markdown_text, encoding="utf-8")
     add_file_size_stats(result.stats, input_size, output_path.stat().st_size)
 
