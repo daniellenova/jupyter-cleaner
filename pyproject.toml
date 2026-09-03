@@ -1,0 +1,17 @@
+[project]
+name = "jupyter-cleaner"
+version = "0.1.0"
+description = "Convert Jupyter notebooks to clean, compact Markdown."
+readme = "README.md"
+authors = [
+    { name = "Danielle Nova", email = "99331448+oNovalSliveDNo@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+jupyter-cleaner = "jupyter_cleaner:main"
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13.0"]
+build-backend = "uv_build"
