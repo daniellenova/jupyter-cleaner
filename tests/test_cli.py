@@ -1,5 +1,6 @@
 """Проверки пользовательского интерфейса командной строки."""
 
+import re
 from pathlib import Path
 from shutil import copyfile
 
@@ -9,6 +10,7 @@ from jupyter_cleaner.cli import app
 
 FIXTURES = Path(__file__).parent / "fixtures"
 runner = CliRunner()
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def copy_fixture(name: str, destination: Path) -> Path:
@@ -25,11 +27,12 @@ def test_help_lists_convert_command() -> None:
 
 def test_convert_help_lists_supported_options() -> None:
     result = runner.invoke(app, ["convert", "--help"])
+    output = ANSI_ESCAPE.sub("", result.output)
 
     assert result.exit_code == 0
-    assert "--keep-outputs" in result.output
-    assert "--no-tables" in result.output
-    assert "--output" in result.output
+    assert "--keep-outputs" in output
+    assert "--no-tables" in output
+    assert "--output" in output
 
 
 def test_convert_file_creates_expected_markdown(tmp_path: Path) -> None:
