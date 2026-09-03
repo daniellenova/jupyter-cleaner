@@ -75,8 +75,31 @@ def convert(
                 dir_okay=False,
             ),
         ],
+        keep_outputs: Annotated[
+            bool,
+            typer.Option(
+                "--keep-outputs",
+                help="Сохранять поддерживаемые результаты выполнения.",
+            ),
+        ] = False,
+        no_tables: Annotated[
+            bool,
+            typer.Option(
+                "--no-tables",
+                help="Не преобразовывать HTML-таблицы в Markdown.",
+            ),
+        ] = False,
+        output: Annotated[
+            Path | None,
+            typer.Option(
+                "--output",
+                "-o",
+                help="Путь к выходному Markdown-файлу.",
+                dir_okay=False,
+            ),
+        ] = None,
 ) -> None:
-    """Преобразует один notebook в Markdown-файл рядом с исходным."""
+    """Преобразует один notebook в Markdown-файл."""
     try:
         notebook = load_notebook(file)
     except NotebookNotFoundError:
@@ -90,8 +113,12 @@ def convert(
         raise typer.Exit(code=1) from None
 
     input_size = file.stat().st_size
-    result = NotebookConverter(ConversionConfig()).convert(notebook)
-    output_path = file.with_suffix(".md")
+    config = ConversionConfig(
+        keep_outputs=keep_outputs,
+        convert_tables=not no_tables,
+    )
+    result = NotebookConverter(config).convert(notebook)
+    output_path = output if output is not None else file.with_suffix(".md")
     output_path.write_text(result.markdown_text, encoding="utf-8")
     add_file_size_stats(result.stats, input_size, output_path.stat().st_size)
 

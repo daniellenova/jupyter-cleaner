@@ -72,6 +72,69 @@ class ConvertCommandTests(unittest.TestCase):
             self.assertIn(f"Создан файл: {output_path}", result.stdout)
             self.assertIn("Обработано ячеек: 1", result.stdout)
 
+    def test_convert_writes_to_explicit_output_path(self):
+        with TemporaryDirectory() as directory:
+            notebook_path = Path(directory) / "sample.ipynb"
+            output_path = Path(directory) / "custom.md"
+            notebook_path.write_text(
+                '{"cells": [{"cell_type": "markdown", "source": ["# Test"]}]}',
+                encoding="utf-8",
+            )
+
+            result = self.runner.invoke(
+                app, ["convert", str(notebook_path), "-o", str(output_path)]
+            )
+
+            self.assertEqual(result.exit_code, 0)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "# Test")
+            self.assertFalse(notebook_path.with_suffix(".md").exists())
+
+    def test_convert_options_control_output_and_table_conversion(self):
+        notebook_path = Path("examples/table.ipynb")
+        with TemporaryDirectory() as directory:
+            tables_path = Path(directory) / "tables.md"
+            plain_path = Path(directory) / "plain.md"
+
+            with_tables = self.runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(notebook_path),
+                    "--keep-outputs",
+                    "--output",
+                    str(tables_path),
+                ],
+            )
+            without_tables = self.runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(notebook_path),
+                    "--keep-outputs",
+                    "--no-tables",
+                    "-o",
+                    str(plain_path),
+                ],
+            )
+
+            self.assertEqual(with_tables.exit_code, 0)
+            self.assertEqual(without_tables.exit_code, 0)
+            self.assertIn("| 0 | 25 | 50000 |", tables_path.read_text("utf-8"))
+            plain_text = plain_path.read_text("utf-8")
+            self.assertNotIn("<table", plain_text)
+            self.assertNotIn("| 0 | 25 | 50000 |", plain_text)
+            self.assertIn("0     25   50000", plain_text)
+
+    def test_convert_help_lists_supported_options(self):
+        result = self.runner.invoke(app, ["convert", "--help"])
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("FILE", result.stdout)
+        self.assertIn("--keep-outputs", result.stdout)
+        self.assertIn("--no-tables", result.stdout)
+        self.assertIn("--output", result.stdout)
+        self.assertIn("-o", result.stdout)
+
     def test_convert_reports_missing_file_without_traceback(self):
         result = self.runner.invoke(app, ["convert", "definitely_missing.ipynb"])
 
