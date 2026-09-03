@@ -76,11 +76,13 @@ class OutputProcessor:
     @staticmethod
     def count_outputs(outputs, stats):
         """Учитывает найденные outputs без их преобразования."""
+        if stats is None:
+            return
         stats.outputs_total += len(outputs)
         stats.html_outputs_skipped += sum(has_html_output(output) for output in outputs)
 
-    def process(self, outputs, config, stats):
-        """Обрабатывает список outputs и обновляет только связанную статистику."""
+    def process(self, outputs, config, stats=None):
+        """Возвращает Markdown и, если передана статистика, явно обновляет её."""
         self.count_outputs(outputs, stats)
         if not config.keep_outputs:
             return ""

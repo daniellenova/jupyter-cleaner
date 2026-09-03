@@ -1,4 +1,5 @@
 import unittest  # Импортируем модуль unittest для создания и запуска тестов
+from copy import deepcopy
 from dataclasses import FrozenInstanceError
 from json import JSONDecodeError
 from pathlib import Path
@@ -121,6 +122,48 @@ class ConverterOutputTests(unittest.TestCase):
         self.assertEqual(result.stats.cells_total, 3)
         self.assertEqual(result.stats.markdown_cells, 1)
         self.assertEqual(result.stats.code_cells, 1)
+
+    def test_conversion_does_not_mutate_notebook_or_config(self):
+        """Исходные данные и неизменяемые настройки используются только для чтения."""
+        notebook = {
+            "cells": [
+                {"cell_type": "markdown", "source": ["# Heading"]},
+                {
+                    "cell_type": "code",
+                    "source": ["print(1)"],
+                    "outputs": [
+                        {"output_type": "stream", "text": ["1\n"]},
+                        {
+                            "output_type": "display_data",
+                            "data": {"text/plain": ["fallback"]},
+                        },
+                    ],
+                },
+            ],
+        }
+        original_notebook = deepcopy(notebook)
+        config = ConversionConfig(keep_outputs=True)
+
+        result = NotebookConverter(config).convert(notebook)
+
+        self.assertIn("```text\n1\n```", result.markdown_text)
+        self.assertEqual(notebook, original_notebook)
+        self.assertEqual(config, ConversionConfig(keep_outputs=True))
+
+    def test_code_cell_does_not_own_hidden_statistics(self):
+        """Без явного параметра статистика не создаётся ради побочного эффекта."""
+        processor = OutputProcessor()
+        cell = CodeCell(
+            "print(1)",
+            [{"output_type": "stream", "text": "1\n"}],
+            processor,
+        )
+
+        self.assertEqual(
+            cell.convert(ConversionConfig(keep_outputs=True)),
+            "```python\nprint(1)\n```\n\n```text\n1\n```",
+        )
+        self.assertFalse(hasattr(cell, "stats"))
 
     def test_cell_empty_check_is_inherited(self):
         self.assertTrue(MarkdownCell(" \n").is_empty())

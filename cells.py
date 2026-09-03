@@ -1,5 +1,4 @@
 from config import ConversionConfig
-from models import ConversionStats
 from outputs import OutputProcessor
 
 
@@ -30,12 +29,14 @@ class CodeCell(Cell):
 
     def __init__(self, source, outputs=None, output_processor=None):
         super().__init__(source)
-        self.outputs = outputs if outputs is not None else []
+        # The cell only reads output objects.  Keeping the collection immutable
+        # prevents conversion code from accidentally changing the notebook's
+        # original list (individual output mappings are likewise only read).
+        self.outputs = tuple(outputs) if outputs is not None else ()
         self.output_processor = output_processor or OutputProcessor()
 
     def convert(self, config=None, stats=None):
         config = config if config is not None else ConversionConfig()
-        stats = stats if stats is not None else ConversionStats()
         converted_parts = [f"```python\n{self.source}\n```"]
 
         converted_outputs = self.output_processor.process(self.outputs, config, stats)
