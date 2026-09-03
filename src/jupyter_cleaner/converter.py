@@ -40,14 +40,16 @@ def load_notebook(file_path: Path | str) -> Notebook:
             raise InvalidNotebookError(path)
         cell_type = raw_cell.get("cell_type")
         source = raw_cell.get("source")
-        if not isinstance(cell_type, str) or not isinstance(source, list) or not all(
-                isinstance(line, str) for line in source
+        if (
+            not isinstance(cell_type, str)
+            or not isinstance(source, list)
+            or not all(isinstance(line, str) for line in source)
         ):
             raise InvalidNotebookError(path)
         cell: NotebookCell = {"cell_type": cell_type, "source": cast(list[str], source)}
         raw_outputs = raw_cell.get("outputs", [])
         if not isinstance(raw_outputs, list) or not all(
-                isinstance(output, dict) for output in raw_outputs
+            isinstance(output, dict) for output in raw_outputs
         ):
             raise InvalidNotebookError(path)
         cell["outputs"] = cast(list[NotebookOutput], raw_outputs)
@@ -100,7 +102,7 @@ class NotebookConverter:
 
 
 def convert_notebook(
-        notebook: Notebook, config: ConversionConfig | None = None
+    notebook: Notebook, config: ConversionConfig | None = None
 ) -> ConversionResult:
     """Возвращает результат преобразования, сохраняя прежний интерфейс функции."""
     config = config if config is not None else ConversionConfig()

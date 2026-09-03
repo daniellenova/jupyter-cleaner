@@ -34,9 +34,7 @@ def format_file_size(size_bytes: int) -> str:
     return f"{value} МБ"
 
 
-def add_file_size_stats(
-        stats: ConversionStats, input_size: int, output_size: int
-) -> None:
+def add_file_size_stats(stats: ConversionStats, input_size: int, output_size: int) -> None:
     """Добавляет размеры файлов в статистику запуска."""
     stats.input_size_bytes = input_size
     stats.output_size_bytes = output_size
@@ -61,8 +59,7 @@ def print_file_size_stats(stats: ConversionStats) -> None:
     """Печатает размеры файлов и их изменение."""
     typer.echo("Размер:")
     typer.echo(
-        f"{format_file_size(stats.input_size_bytes)} → "
-        f"{format_file_size(stats.output_size_bytes)}"
+        f"{format_file_size(stats.input_size_bytes)} → {format_file_size(stats.output_size_bytes)}"
     )
     if stats.size_reduction_percent >= 0:
         typer.echo(f"Уменьшение: {stats.size_reduction_percent:.1f} %")
@@ -70,9 +67,7 @@ def print_file_size_stats(stats: ConversionStats) -> None:
         typer.echo(f"Изменение размера: {-stats.size_reduction_percent:+.1f} %")
 
 
-def convert_file(
-        file: Path, config: ConversionConfig, output: Path | None = None
-) -> None:
+def convert_file(file: Path, config: ConversionConfig, output: Path | None = None) -> None:
     """Преобразует один notebook и печатает его статистику."""
     notebook = load_notebook(file)
     input_size = file.stat().st_size
@@ -88,37 +83,37 @@ def convert_file(
 
 @app.command()
 def convert(
-        path: Annotated[
-            Path,
-            typer.Argument(
-                help="Путь к исходному notebook (.ipynb) или каталогу.",
-                metavar="PATH",
-                exists=False,
-            ),
-        ],
-        keep_outputs: Annotated[
-            bool,
-            typer.Option(
-                "--keep-outputs",
-                help="Сохранять поддерживаемые результаты выполнения.",
-            ),
-        ] = False,
-        no_tables: Annotated[
-            bool,
-            typer.Option(
-                "--no-tables",
-                help="Не преобразовывать HTML-таблицы в Markdown.",
-            ),
-        ] = False,
-        output: Annotated[
-            Path | None,
-            typer.Option(
-                "--output",
-                "-o",
-                help="Путь к выходному Markdown-файлу.",
-                dir_okay=False,
-            ),
-        ] = None,
+    path: Annotated[
+        Path,
+        typer.Argument(
+            help="Путь к исходному notebook (.ipynb) или каталогу.",
+            metavar="PATH",
+            exists=False,
+        ),
+    ],
+    keep_outputs: Annotated[
+        bool,
+        typer.Option(
+            "--keep-outputs",
+            help="Сохранять поддерживаемые результаты выполнения.",
+        ),
+    ] = False,
+    no_tables: Annotated[
+        bool,
+        typer.Option(
+            "--no-tables",
+            help="Не преобразовывать HTML-таблицы в Markdown.",
+        ),
+    ] = False,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Путь к выходному Markdown-файлу.",
+            dir_okay=False,
+        ),
+    ] = None,
 ) -> None:
     """Преобразует notebook или все notebook-файлы в каталоге."""
     config = ConversionConfig(

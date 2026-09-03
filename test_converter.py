@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError
 from json import JSONDecodeError
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, cast
 
 from typer.testing import CliRunner
 
@@ -23,6 +24,7 @@ from jupyter_cleaner.exceptions import (
 from jupyter_cleaner.models import ConversionResult, ConversionStats
 from jupyter_cleaner.outputs import OutputProcessor, convert_output
 from jupyter_cleaner.tables import TableConverter
+from jupyter_cleaner.types import Notebook
 
 
 # Импортируем тестируемые функции из модуля converter
@@ -31,14 +33,14 @@ from jupyter_cleaner.tables import TableConverter
 class NotebookLoadingTests(unittest.TestCase):
     """Проверяет преобразование ошибок ввода в исключения предметной области."""
 
-    def test_missing_file_raises_notebook_error_with_original_cause(self):
+    def test_missing_file_raises_notebook_error_with_original_cause(self) -> None:
         with self.assertRaises(NotebookNotFoundError) as context:
             load_notebook("definitely_missing.ipynb")
 
         self.assertIsInstance(context.exception, NotebookError)
         self.assertIsInstance(context.exception.__cause__, FileNotFoundError)
 
-    def test_invalid_json_raises_notebook_error_with_original_cause(self):
+    def test_invalid_json_raises_notebook_error_with_original_cause(self) -> None:
         with TemporaryDirectory() as directory:
             notebook_path = Path(directory) / "broken.ipynb"
             notebook_path.write_text("{broken", encoding="utf-8")
@@ -53,10 +55,10 @@ class NotebookLoadingTests(unittest.TestCase):
 class ConvertCommandTests(unittest.TestCase):
     """Проверяет основной пользовательский сценарий ``convert FILE``."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.runner = CliRunner()
 
-    def test_convert_writes_markdown_next_to_notebook(self):
+    def test_convert_writes_markdown_next_to_notebook(self) -> None:
         with TemporaryDirectory() as directory:
             notebook_path = Path(directory) / "sample.ipynb"
             notebook_path.write_text(
@@ -72,7 +74,7 @@ class ConvertCommandTests(unittest.TestCase):
             self.assertIn(f"Создан файл: {output_path}", result.stdout)
             self.assertIn("Обработано ячеек: 1", result.stdout)
 
-    def test_convert_writes_to_explicit_output_path(self):
+    def test_convert_writes_to_explicit_output_path(self) -> None:
         with TemporaryDirectory() as directory:
             notebook_path = Path(directory) / "sample.ipynb"
             output_path = Path(directory) / "custom.md"
@@ -89,7 +91,7 @@ class ConvertCommandTests(unittest.TestCase):
             self.assertEqual(output_path.read_text(encoding="utf-8"), "# Test")
             self.assertFalse(notebook_path.with_suffix(".md").exists())
 
-    def test_convert_options_control_output_and_table_conversion(self):
+    def test_convert_options_control_output_and_table_conversion(self) -> None:
         notebook_path = Path("examples/table.ipynb")
         with TemporaryDirectory() as directory:
             tables_path = Path(directory) / "tables.md"
@@ -125,7 +127,7 @@ class ConvertCommandTests(unittest.TestCase):
             self.assertNotIn("| 0 | 25 | 50000 |", plain_text)
             self.assertIn("0   25   50000", plain_text)
 
-    def test_convert_help_lists_supported_options(self):
+    def test_convert_help_lists_supported_options(self) -> None:
         result = self.runner.invoke(app, ["convert", "--help"])
 
         self.assertEqual(result.exit_code, 0)
@@ -135,14 +137,14 @@ class ConvertCommandTests(unittest.TestCase):
         self.assertIn("--output", result.stdout)
         self.assertIn("-o", result.stdout)
 
-    def test_convert_reports_missing_file_without_traceback(self):
+    def test_convert_reports_missing_file_without_traceback(self) -> None:
         result = self.runner.invoke(app, ["convert", "definitely_missing.ipynb"])
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("не найден", result.output)
         self.assertNotIn("Traceback", result.output)
 
-    def test_convert_reports_invalid_json_without_traceback(self):
+    def test_convert_reports_invalid_json_without_traceback(self) -> None:
         with TemporaryDirectory() as directory:
             notebook_path = Path(directory) / "broken.ipynb"
             notebook_path.write_text("{broken", encoding="utf-8")
@@ -153,19 +155,18 @@ class ConvertCommandTests(unittest.TestCase):
         self.assertIn("некорректный JSON", result.output)
         self.assertNotIn("Traceback", result.output)
 
-    def test_convert_directory_processes_sorted_top_level_notebooks(self):
+    def test_convert_directory_processes_sorted_top_level_notebooks(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory)
             nested = path / "nested"
             nested.mkdir()
             for notebook_path, heading in (
-                    (path / "b.ipynb", "# B"),
-                    (path / "a.ipynb", "# A"),
-                    (nested / "ignored.ipynb", "# Ignored"),
+                (path / "b.ipynb", "# B"),
+                (path / "a.ipynb", "# A"),
+                (nested / "ignored.ipynb", "# Ignored"),
             ):
                 notebook_path.write_text(
-                    '{"cells": [{"cell_type": "markdown", "source": ['
-                    f'"{heading}"]}}]}}',
+                    f'{{"cells": [{{"cell_type": "markdown", "source": ["{heading}"]}}]}}',
                     encoding="utf-8",
                 )
 
@@ -175,14 +176,12 @@ class ConvertCommandTests(unittest.TestCase):
             self.assertEqual((path / "a.md").read_text("utf-8"), "# A")
             self.assertEqual((path / "b.md").read_text("utf-8"), "# B")
             self.assertFalse((nested / "ignored.md").exists())
-            self.assertLess(
-                result.stdout.index("a.md"), result.stdout.index("b.md")
-            )
+            self.assertLess(result.stdout.index("a.md"), result.stdout.index("b.md"))
             self.assertIn("Преобразовано: 2", result.stdout)
             self.assertIn("Ошибок: 0", result.stdout)
             self.assertIn("Всего: 2", result.stdout)
 
-    def test_convert_directory_continues_after_invalid_notebook(self):
+    def test_convert_directory_continues_after_invalid_notebook(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory)
             (path / "broken.ipynb").write_text("{broken", encoding="utf-8")
@@ -201,23 +200,21 @@ class ConvertCommandTests(unittest.TestCase):
             self.assertIn("Ошибок: 1", result.output)
             self.assertIn("Всего: 2", result.output)
 
-    def test_convert_empty_directory_fails_with_clear_message(self):
+    def test_convert_empty_directory_fails_with_clear_message(self) -> None:
         with TemporaryDirectory() as directory:
             result = self.runner.invoke(app, ["convert", directory])
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("В каталоге не найдено файлов .ipynb.", result.output)
 
-    def test_convert_directory_rejects_output_option(self):
+    def test_convert_directory_rejects_output_option(self) -> None:
         with TemporaryDirectory() as directory:
-            result = self.runner.invoke(
-                app, ["convert", directory, "--output", "combined.md"]
-            )
+            result = self.runner.invoke(app, ["convert", directory, "--output", "combined.md"])
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("--output нельзя использовать", result.output)
 
-    def test_convert_directory_applies_conversion_options_to_every_file(self):
+    def test_convert_directory_applies_conversion_options_to_every_file(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory)
             for name in ("first.ipynb", "second.ipynb"):
@@ -241,7 +238,7 @@ class ConvertCommandTests(unittest.TestCase):
 class ConversionModelTests(unittest.TestCase):
     """Проверяет начальное состояние объектов результата и статистики."""
 
-    def test_stats_have_zero_defaults(self):
+    def test_stats_have_zero_defaults(self) -> None:
         stats = ConversionStats()
 
         self.assertEqual(stats.cells_total, 0)
@@ -256,21 +253,21 @@ class ConversionModelTests(unittest.TestCase):
         self.assertEqual(stats.output_size_bytes, 0)
         self.assertEqual(stats.size_reduction_percent, 0.0)
 
-    def test_result_owns_independent_default_stats(self):
+    def test_result_owns_independent_default_stats(self) -> None:
         first = ConversionResult("first")
         second = ConversionResult("second")
 
         self.assertIsInstance(first.stats, ConversionStats)
         self.assertIsNot(first.stats, second.stats)
 
-    def test_config_has_current_defaults_and_is_immutable(self):
+    def test_config_has_current_defaults_and_is_immutable(self) -> None:
         config = ConversionConfig()
 
         self.assertFalse(config.keep_outputs)
         self.assertTrue(config.remove_empty_cells)
         self.assertTrue(config.convert_tables)
         with self.assertRaises(FrozenInstanceError):
-            config.keep_outputs = True
+            config.keep_outputs = True  # type: ignore[misc]
 
 
 class ConverterOutputTests(unittest.TestCase):
@@ -279,7 +276,7 @@ class ConverterOutputTests(unittest.TestCase):
     Наследуется от unittest.TestCase для интеграции с фреймворком тестирования.
     """
 
-    def test_cell_classes_convert_their_own_source(self):
+    def test_cell_classes_convert_their_own_source(self) -> None:
         markdown = MarkdownCell("# Заголовок\n")
         code = CodeCell("print('hello')")
 
@@ -288,24 +285,25 @@ class ConverterOutputTests(unittest.TestCase):
         self.assertEqual(markdown.convert(), "# Заголовок\n")
         self.assertEqual(code.convert(), "```python\nprint('hello')\n```")
 
-    def test_notebook_converter_owns_config_and_shared_processors(self):
+    def test_notebook_converter_owns_config_and_shared_processors(self) -> None:
         config = ConversionConfig(keep_outputs=True)
         converter = NotebookConverter(config)
 
         self.assertIs(converter.config, config)
         self.assertIsInstance(converter.output_processor, OutputProcessor)
-        self.assertIsInstance(
-            converter.output_processor.table_converter, TableConverter
-        )
+        self.assertIsInstance(converter.output_processor.table_converter, TableConverter)
 
-    def test_notebook_converter_returns_conversion_result(self):
-        notebook = {
-            "cells": [
-                {"cell_type": "markdown", "source": ["# Heading"]},
-                {"cell_type": "code", "source": ["answer = 42"], "outputs": []},
-                {"cell_type": "raw", "source": ["ignored"]},
-            ],
-        }
+    def test_notebook_converter_returns_conversion_result(self) -> None:
+        notebook = cast(
+            Notebook,
+            {
+                "cells": [
+                    {"cell_type": "markdown", "source": ["# Heading"]},
+                    {"cell_type": "code", "source": ["answer = 42"], "outputs": []},
+                    {"cell_type": "raw", "source": ["ignored"]},
+                ],
+            },
+        )
 
         result = NotebookConverter(ConversionConfig()).convert(notebook)
 
@@ -318,24 +316,27 @@ class ConverterOutputTests(unittest.TestCase):
         self.assertEqual(result.stats.markdown_cells, 1)
         self.assertEqual(result.stats.code_cells, 1)
 
-    def test_conversion_does_not_mutate_notebook_or_config(self):
+    def test_conversion_does_not_mutate_notebook_or_config(self) -> None:
         """Исходные данные и неизменяемые настройки используются только для чтения."""
-        notebook = {
-            "cells": [
-                {"cell_type": "markdown", "source": ["# Heading"]},
-                {
-                    "cell_type": "code",
-                    "source": ["print(1)"],
-                    "outputs": [
-                        {"output_type": "stream", "text": ["1\n"]},
-                        {
-                            "output_type": "display_data",
-                            "data": {"text/plain": ["fallback"]},
-                        },
-                    ],
-                },
-            ],
-        }
+        notebook = cast(
+            Notebook,
+            {
+                "cells": [
+                    {"cell_type": "markdown", "source": ["# Heading"]},
+                    {
+                        "cell_type": "code",
+                        "source": ["print(1)"],
+                        "outputs": [
+                            {"output_type": "stream", "text": ["1\n"]},
+                            {
+                                "output_type": "display_data",
+                                "data": {"text/plain": ["fallback"]},
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
         original_notebook = deepcopy(notebook)
         config = ConversionConfig(keep_outputs=True)
 
@@ -345,7 +346,7 @@ class ConverterOutputTests(unittest.TestCase):
         self.assertEqual(notebook, original_notebook)
         self.assertEqual(config, ConversionConfig(keep_outputs=True))
 
-    def test_code_cell_does_not_own_hidden_statistics(self):
+    def test_code_cell_does_not_own_hidden_statistics(self) -> None:
         """Без явного параметра статистика не создаётся ради побочного эффекта."""
         processor = OutputProcessor()
         cell = CodeCell(
@@ -360,33 +361,34 @@ class ConverterOutputTests(unittest.TestCase):
         )
         self.assertFalse(hasattr(cell, "stats"))
 
-    def test_cell_empty_check_is_inherited(self):
+    def test_cell_empty_check_is_inherited(self) -> None:
         self.assertTrue(MarkdownCell(" \n").is_empty())
         self.assertTrue(CodeCell("").is_empty())
         self.assertFalse(CodeCell("pass").is_empty())
 
-    def test_empty_cells_can_be_preserved_by_config(self):
-        notebook = {
-            "cells": [
-                {"cell_type": "markdown", "source": [" "]},
-                {"cell_type": "code", "source": [], "outputs": []},
-            ],
-        }
-
-        result = convert_notebook(
-            notebook, ConversionConfig(remove_empty_cells=False)
+    def test_empty_cells_can_be_preserved_by_config(self) -> None:
+        notebook = cast(
+            Notebook,
+            {
+                "cells": [
+                    {"cell_type": "markdown", "source": [" "]},
+                    {"cell_type": "code", "source": [], "outputs": []},
+                ],
+            },
         )
+
+        result = convert_notebook(notebook, ConversionConfig(remove_empty_cells=False))
 
         self.assertIn("```python\n\n```", result.markdown_text)
         self.assertEqual(result.stats.empty_cells_removed, 0)
         self.assertEqual(result.stats.markdown_cells, 1)
         self.assertEqual(result.stats.code_cells, 1)
 
-    def test_base_cell_does_not_implement_conversion(self):
+    def test_base_cell_does_not_implement_conversion(self) -> None:
         with self.assertRaises(NotImplementedError):
             Cell("text").convert()
 
-    def test_example_outputs_are_ignored(self):
+    def test_example_outputs_are_ignored(self) -> None:
         """
         Тест проверяет, что выходные данные (outputs) ячеек игнорируются
         при конвертации notebook в Markdown.
@@ -399,7 +401,6 @@ class ConverterOutputTests(unittest.TestCase):
         expectations = {
             # В basic.ipynb не должно быть строки "Привет, Даня!\n"
             "examples/basic.ipynb": ["Привет, Даня!\n"],
-
             # В table.ipynb не должно быть HTML-таблиц
             "examples/table.ipynb": [
                 "SHOULD_NOT_APPEAR_HTML_TABLE",  # Маркер из ячейки
@@ -407,7 +408,6 @@ class ConverterOutputTests(unittest.TestCase):
                 "<tr>",  # HTML тег строки
                 "<td>",  # HTML тег ячейки
             ],
-
             # В html_output.ipynb не должно быть HTML-вывода
             "examples/html_output.ipynb": [
                 "SHOULD_NOT_APPEAR_HTML_OUTPUT",  # Маркер из ячейки
@@ -432,7 +432,7 @@ class ConverterOutputTests(unittest.TestCase):
 class ConversionStatsTests(unittest.TestCase):
     """Проверяет значения статистики в обоих режимах преобразования."""
 
-    def test_stats_without_outputs(self):
+    def test_stats_without_outputs(self) -> None:
         notebook = load_notebook("examples/table.ipynb")
 
         result = convert_notebook(notebook)
@@ -445,14 +445,17 @@ class ConversionStatsTests(unittest.TestCase):
         self.assertEqual(stats.cells_total, len(notebook["cells"]))
         self.assertEqual(
             stats.outputs_total,
-            sum(len(cell.get("outputs", [])) for cell in notebook["cells"]
-                if cell["cell_type"] == "code"),
+            sum(
+                len(cell.get("outputs", []))
+                for cell in notebook["cells"]
+                if cell["cell_type"] == "code"
+            ),
         )
         self.assertEqual(stats.text_outputs_kept, 0)
         self.assertEqual(stats.tables_converted, 0)
         self.assertEqual(stats.html_outputs_skipped, 1)
 
-    def test_stats_with_outputs(self):
+    def test_stats_with_outputs(self) -> None:
         notebook = load_notebook("examples/table.ipynb")
 
         result = convert_notebook(notebook, ConversionConfig(keep_outputs=True))
@@ -466,74 +469,87 @@ class ConversionStatsTests(unittest.TestCase):
         self.assertEqual(stats.tables_converted, 1)
         self.assertEqual(stats.html_outputs_skipped, 1)
 
-    def test_counts_empty_cells_and_plain_outputs(self):
-        notebook = {
-            "cells": [
-                {"cell_type": "markdown", "source": ["heading"]},
-                {"cell_type": "markdown", "source": ["  \n"]},
-                {"cell_type": "code", "source": ["print(1)"], "outputs": [
-                    {"output_type": "stream", "text": ["1\n"]},
-                ]},
-                {"cell_type": "code", "source": [], "outputs": [
-                    {"output_type": "stream", "text": "not kept"},
-                ]},
-                {"cell_type": "raw", "source": ["ignored"]},
-            ],
-        }
+    def test_counts_empty_cells_and_plain_outputs(self) -> None:
+        notebook = cast(
+            Notebook,
+            {
+                "cells": [
+                    {"cell_type": "markdown", "source": ["heading"]},
+                    {"cell_type": "markdown", "source": ["  \n"]},
+                    {
+                        "cell_type": "code",
+                        "source": ["print(1)"],
+                        "outputs": [
+                            {"output_type": "stream", "text": ["1\n"]},
+                        ],
+                    },
+                    {
+                        "cell_type": "code",
+                        "source": [],
+                        "outputs": [
+                            {"output_type": "stream", "text": "not kept"},
+                        ],
+                    },
+                    {"cell_type": "raw", "source": ["ignored"]},
+                ],
+            },
+        )
 
         result = convert_notebook(notebook, ConversionConfig(keep_outputs=True))
         markdown = result.markdown_text
         stats = result.stats
 
         self.assertIn("```text\n1\n```", markdown)
-        self.assertEqual(stats, ConversionStats(
-            cells_total=5,
-            code_cells=1,
-            markdown_cells=1,
-            empty_cells_removed=2,
-            outputs_total=2,
-            text_outputs_kept=1,
-        ))
+        self.assertEqual(
+            stats,
+            ConversionStats(
+                cells_total=5,
+                code_cells=1,
+                markdown_cells=1,
+                empty_cells_removed=2,
+                outputs_total=2,
+                text_outputs_kept=1,
+            ),
+        )
 
-    def test_converts_supported_pandas_table(self):
+    def test_converts_supported_pandas_table(self) -> None:
         """Поддерживаемая таблица превращается в Markdown без дублирования."""
         notebook = load_notebook("examples/table.ipynb")
-        output = notebook["cells"][1]["outputs"][0]
+        cells = cast(list[dict[str, Any]], notebook["cells"])
+        output = cast(list[dict[str, Any]], cells[1]["outputs"])[0]
+
         html_text = "".join(output["data"]["text/html"])
 
         converter = TableConverter()
         self.assertTrue(converter.is_supported(html_text))
         self.assertEqual(
             converter.convert(html_text),
-            "|  | age | salary |\n"
-            "|---|---|---|\n"
-            "| 0 | 25 | 50000 |\n"
-            "| 1 | 31 | 72000 |",
+            "|  | age | salary |\n|---|---|---|\n| 0 | 25 | 50000 |\n| 1 | 31 | 72000 |",
         )
         converted = convert_output(output)
-        self.assertNotIn("<table", converted)
+        self.assertNotIn("<table", str(converted))
         self.assertNotIn("age  salary", converted)
         self.assertEqual(converted.count("| 0 | 25 | 50000 |"), 1)
 
-    def test_output_processor_delegates_html_table_conversion(self):
+    def test_output_processor_delegates_html_table_conversion(self) -> None:
         """OutputProcessor принимает решение и делегирует обработку таблицы."""
 
         class RecordingTableConverter:
-            def __init__(self):
-                self.checked = []
-                self.converted = []
+            def __init__(self) -> None:
+                self.checked: list[str] = []
+                self.converted: list[str] = []
 
-            def is_supported(self, html_text):
+            def is_supported(self, html_text: str) -> bool:
                 self.checked.append(html_text)
                 return True
 
-            def convert(self, html_text):
+            def convert(self, html_text: str) -> str:
                 self.converted.append(html_text)
                 return "| delegated |\n|---|"
 
         converter = RecordingTableConverter()
-        processor = OutputProcessor(converter)
-        output = {
+        processor = OutputProcessor(cast(TableConverter, converter))
+        output: dict[str, Any] = {
             "output_type": "display_data",
             "data": {"text/html": "<table>only table input</table>"},
         }
@@ -546,7 +562,7 @@ class ConversionStatsTests(unittest.TestCase):
         self.assertEqual(converter.converted, ["<table>only table input</table>"])
         self.assertEqual(stats.tables_converted, 1)
 
-    def test_decodes_and_normalizes_cell_text(self):
+    def test_decodes_and_normalizes_cell_text(self) -> None:
         """Сущности, переносы и Markdown-разделитель обрабатываются в ячейке."""
         html_text = """<table class="dataframe">
 <thead><tr><th></th><th>name</th></tr></thead>
@@ -559,9 +575,9 @@ Bob | team </td></tr></tbody>
             "|  | name |\n|---|---|\n| 0 | Alice & Bob \\| team |",
         )
 
-    def test_unsupported_table_falls_back_to_plain_text(self):
+    def test_unsupported_table_falls_back_to_plain_text(self) -> None:
         """Неподдерживаемая HTML-таблица не мешает сохранить text/plain."""
-        output = {
+        output: dict[str, Any] = {
             "output_type": "display_data",
             "data": {
                 "text/html": "<table><tr><td>HTML</td></tr></table>",
@@ -572,7 +588,7 @@ Bob | team </td></tr></tbody>
         self.assertFalse(TableConverter().is_supported(output["data"]["text/html"]))
         self.assertEqual(convert_output(output), "```text\nsafe fallback\n```")
 
-    def test_table_conversion_can_be_disabled_by_config(self):
+    def test_table_conversion_can_be_disabled_by_config(self) -> None:
         notebook = load_notebook("examples/table.ipynb")
         output = notebook["cells"][1]["outputs"][0]
 
@@ -583,11 +599,11 @@ Bob | team </td></tr></tbody>
         self.assertNotIn("| 0 | 25 | 50000 |", converted)
         self.assertIn("age  salary", converted)
 
-    def test_rejects_arbitrary_content_around_table(self):
+    def test_rejects_arbitrary_content_around_table(self) -> None:
         """Разрешённая обёртка не превращает парсер в обработчик любого HTML."""
         table = (
             '<table class="dataframe"><thead><tr><th>x</th></tr></thead>'
-            '<tbody><tr><th>0</th></tr></tbody></table>'
+            "<tbody><tr><th>0</th></tr></tbody></table>"
         )
 
         converter = TableConverter()
@@ -595,17 +611,17 @@ Bob | team </td></tr></tbody>
         self.assertFalse(converter.is_supported("<div>text" + table + "</div>"))
         self.assertFalse(converter.is_supported("<div>" + table + "</div><p>extra</p>"))
 
-    def test_malformed_pandas_table_falls_back_or_is_skipped(self):
+    def test_malformed_pandas_table_falls_back_or_is_skipped(self) -> None:
         """Повреждённая таблица не создаёт частичный Markdown."""
         malformed = (
             '<table class="dataframe"><thead><tr><th>x</th></tr></thead>'
-            '<tbody><tr><th>0</th><td>extra</td></tr></tbody></table>'
+            "<tbody><tr><th>0</th><td>extra</td></tr></tbody></table>"
         )
-        with_plain = {
+        with_plain: dict[str, Any] = {
             "output_type": "execute_result",
             "data": {"text/html": malformed, "text/plain": "fallback"},
         }
-        without_plain = {
+        without_plain: dict[str, Any] = {
             "output_type": "execute_result",
             "data": {"text/html": malformed},
         }
@@ -614,12 +630,12 @@ Bob | team </td></tr></tbody>
         self.assertEqual(convert_output(with_plain), "```text\nfallback\n```")
         self.assertEqual(convert_output(without_plain), "")
 
-    def test_regular_html_is_not_a_pandas_table(self):
+    def test_regular_html_is_not_a_pandas_table(self) -> None:
         """Обычный строковый результат корректно использует text/plain."""
         notebook = load_notebook("examples/html_output.ipynb")
         output = notebook["cells"][1]["outputs"][0]
 
-        self.assertNotIn("text/html", output["data"])
+        self.assertNotIn("text/html", str(output["data"]))
         self.assertEqual(
             convert_output(output),
             "```text\n'<strong>Готово</strong>'\n```",

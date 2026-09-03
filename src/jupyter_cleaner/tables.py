@@ -44,7 +44,7 @@ class TableConverter:
             closing_start = html_text.find(closing_tag, opening_end + 1)
             if closing_start == -1:
                 return None
-            blocks.append(html_text[opening_end + 1:closing_start])
+            blocks.append(html_text[opening_end + 1 : closing_start])
             position = closing_start + len(closing_tag)
         return blocks
 
@@ -57,21 +57,24 @@ class TableConverter:
             if position == len(row_html):
                 break
             tag_name = next(
-                (name for name in ("th", "td")
-                 if self._opening_tag_end(row_html, name, position) != -1),
+                (
+                    name
+                    for name in ("th", "td")
+                    if self._opening_tag_end(row_html, name, position) != -1
+                ),
                 None,
             )
             if tag_name is None:
                 return None
             opening_end = self._opening_tag_end(row_html, tag_name, position)
-            opening_tag = row_html[position:opening_end + 1].lower()
+            opening_tag = row_html[position : opening_end + 1].lower()
             if "rowspan" in opening_tag or "colspan" in opening_tag:
                 return None
             closing_tag = f"</{tag_name}>"
             closing_start = row_html.find(closing_tag, opening_end + 1)
             if closing_start == -1:
                 return None
-            value = row_html[opening_end + 1:closing_start]
+            value = row_html[opening_end + 1 : closing_start]
             if "<" in value or ">" in value:
                 return None
             value = html.unescape(value)
@@ -94,7 +97,7 @@ class TableConverter:
         style_end = self._opening_tag_end(prefix, "style", position)
         if style_end != -1:
             style_close = prefix.find("</style>", style_end + 1)
-            style_body = prefix[style_end + 1:style_close]
+            style_body = prefix[style_end + 1 : style_close]
             if style_close == -1 or "<" in style_body or ">" in style_body:
                 return False
             position = style_close + len("</style>")
@@ -109,8 +112,8 @@ class TableConverter:
         table_open_end = self._opening_tag_end(html_text, "table", table_start)
         if table_open_end == -1:
             return None
-        opening_tag = html_text[table_start:table_open_end + 1]
-        attributes = opening_tag[len("<table"):-1].replace("'", '"')
+        opening_tag = html_text[table_start : table_open_end + 1]
+        attributes = opening_tag[len("<table") : -1].replace("'", '"')
         class_marker = 'class="'
         class_start = attributes.find(class_marker)
         while class_start > 0 and not attributes[class_start - 1].isspace():
@@ -118,15 +121,20 @@ class TableConverter:
         if class_start == -1:
             return None
         class_end = attributes.find('"', class_start + len(class_marker))
-        classes = attributes[class_start + len(class_marker):class_end].split()
+        classes = attributes[class_start + len(class_marker) : class_end].split()
         if class_end == -1 or "dataframe" not in classes:
             return None
         table_close = html_text.find("</table>", table_open_end + 1)
         if table_close == -1 or not self._has_supported_wrapper(
-                html_text[:table_start], html_text[table_close + len("</table>"):]):
+            html_text[:table_start], html_text[table_close + len("</table>") :]
+        ):
             return None
-        table_body = html_text[table_open_end + 1:table_close]
-        if "<table" in table_body or "rowspan" in table_body.lower() or "colspan" in table_body.lower():
+        table_body = html_text[table_open_end + 1 : table_close]
+        if (
+            "<table" in table_body
+            or "rowspan" in table_body.lower()
+            or "colspan" in table_body.lower()
+        ):
             return None
         sections: list[str] = []
         position = 0
@@ -140,7 +148,7 @@ class TableConverter:
             section_close = table_body.find(close_tag, section_open_end + 1)
             if section_close == -1:
                 return None
-            sections.append(table_body[section_open_end + 1:section_close])
+            sections.append(table_body[section_open_end + 1 : section_close])
             position = section_close + len(close_tag)
         if table_body[position:].strip():
             return None
@@ -157,7 +165,8 @@ class TableConverter:
             return None
         if any(tag != "th" for tag, _ in parsed_rows[0]):
             return None
-        if any(row[0][0] != "th" or any(tag != "td" for tag, _ in row[1:])
-               for row in parsed_rows[1:]):
+        if any(
+            row[0][0] != "th" or any(tag != "td" for tag, _ in row[1:]) for row in parsed_rows[1:]
+        ):
             return None
         return [[value for _, value in row] for row in parsed_rows]

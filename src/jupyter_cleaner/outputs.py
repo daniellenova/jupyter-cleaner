@@ -51,17 +51,16 @@ def _format_text_output(output_text: str) -> str:
 
 
 def convert_output(
-        output: NotebookOutput,
-        config: ConversionConfig | None = None,
-        stats: ConversionStats | None = None,
-        table_converter: TableConverter | None = None,
+    output: NotebookOutput,
+    config: ConversionConfig | None = None,
+    stats: ConversionStats | None = None,
+    table_converter: TableConverter | None = None,
 ) -> str:
     """Преобразует один поддерживаемый результат выполнения в Markdown."""
     config = config if config is not None else ConversionConfig()
     html_text = extract_html_output(output)
     table_converter = table_converter or TableConverter()
-    if (config.convert_tables and html_text is not None
-            and table_converter.is_supported(html_text)):
+    if config.convert_tables and html_text is not None and table_converter.is_supported(html_text):
         table = table_converter.convert(html_text)
         if table is not None:
             if stats is not None:
@@ -83,9 +82,7 @@ class OutputProcessor:
         self.table_converter: TableConverter = table_converter or TableConverter()
 
     @staticmethod
-    def count_outputs(
-            outputs: Sequence[NotebookOutput], stats: ConversionStats | None
-    ) -> None:
+    def count_outputs(outputs: Sequence[NotebookOutput], stats: ConversionStats | None) -> None:
         """Учитывает найденные outputs без их преобразования."""
         if stats is None:
             return
@@ -93,16 +90,17 @@ class OutputProcessor:
         stats.html_outputs_skipped += sum(has_html_output(output) for output in outputs)
 
     def process(
-            self,
-            outputs: Sequence[NotebookOutput],
-            config: ConversionConfig,
-            stats: ConversionStats | None = None,
+        self,
+        outputs: Sequence[NotebookOutput],
+        config: ConversionConfig,
+        stats: ConversionStats | None = None,
     ) -> str:
         """Возвращает Markdown и, если передана статистика, явно обновляет её."""
         self.count_outputs(outputs, stats)
         if not config.keep_outputs:
             return ""
 
-        converted = [convert_output(output, config, stats, self.table_converter)
-                     for output in outputs]
+        converted = [
+            convert_output(output, config, stats, self.table_converter) for output in outputs
+        ]
         return "\n\n".join(part for part in converted if part)
