@@ -1,3 +1,7 @@
+# Обезличенный пример анализа данных
+
+Этот notebook получен из реального рабочего сценария; имена, билеты и другие идентификаторы в сохранённых выводах заменены вымышленными значениями.
+
 # Импорт необходимых библиотек
 
 ```python
@@ -54,30 +58,30 @@ raw_data
 890          891         0       3   
 
                                                   Name     Sex   Age  SibSp  \
-0                              Braund, Mr. Owen Harris    male  22.0      1   
-1    Cumings, Mrs. John Bradley (Florence Briggs Th...  female  38.0      1   
-2                               Heikkinen, Miss. Laina  female  26.0      0   
-3         Futrelle, Mrs. Jacques Heath (Lily May Peel)  female  35.0      1   
-4                             Allen, Mr. William Henry    male  35.0      0   
+0                              Example, Mr. Alex    male  22.0      1   
+1    Sample, Mrs. Blair  female  38.0      1   
+2                               Demo, Miss. Casey  female  26.0      0   
+3         Placeholder, Mrs. Dana  female  35.0      1   
+4                             Record, Mr. Ellis    male  35.0      0   
 ..                                                 ...     ...   ...    ...   
-886                              Montvila, Rev. Juozas    male  27.0      0   
-887                       Graham, Miss. Margaret Edith  female  19.0      0   
-888           Johnston, Miss. Catherine Helen "Carrie"  female   NaN      1   
-889                              Behr, Mr. Karl Howell    male  26.0      0   
-890                                Dooley, Mr. Patrick    male  32.0      0   
+886                              Example, Rev. Finley    male  27.0      0   
+887                       Sample, Miss. Gray  female  19.0      0   
+888           Demo, Miss. Harper  female   NaN      1   
+889                              Placeholder, Mr. Jules    male  26.0      0   
+890                                Record, Mr. Kelly    male  32.0      0   
 
      Parch            Ticket     Fare Cabin Embarked  
-0        0         A/5 21171   7.2500   NaN        S  
-1        0          PC 17599  71.2833   C85        C  
-2        0  STON/O2. 3101282   7.9250   NaN        S  
-3        0            113803  53.1000  C123        S  
-4        0            373450   8.0500   NaN        S  
+0        0         DEMO-0001   7.2500   NaN        S  
+1        0          DEMO-0002  71.2833   CABIN-A        C  
+2        0  DEMO-0003   7.9250   NaN        S  
+3        0            DEMO-0004  53.1000  CABIN-B        S  
+4        0            DEMO-0005   8.0500   NaN        S  
 ..     ...               ...      ...   ...      ...  
-886      0            211536  13.0000   NaN        S  
-887      0            112053  30.0000   B42        S  
-888      2        W./C. 6607  23.4500   NaN        S  
-889      0            111369  30.0000  C148        C  
-890      0            370376   7.7500   NaN        Q  
+886      0            DEMO-0887  13.0000   NaN        S  
+887      0            DEMO-0888  30.0000   CABIN-C        S  
+888      2        DEMO-0889  23.4500   NaN        S  
+889      0            DEMO-0890  30.0000  CABIN-D        C  
+890      0            DEMO-0891   7.7500   NaN        Q  
 
 [891 rows x 12 columns]
 ```
@@ -168,17 +172,17 @@ raw_data[["Name", "Age"]]
 
 ```text
                                                   Name   Age
-0                              Braund, Mr. Owen Harris  22.0
-1    Cumings, Mrs. John Bradley (Florence Briggs Th...  38.0
-2                               Heikkinen, Miss. Laina  26.0
-3         Futrelle, Mrs. Jacques Heath (Lily May Peel)  35.0
-4                             Allen, Mr. William Henry  35.0
+0                              Example, Mr. Alex  22.0
+1    Sample, Mrs. Blair  38.0
+2                               Demo, Miss. Casey  26.0
+3         Placeholder, Mrs. Dana  35.0
+4                             Record, Mr. Ellis  35.0
 ..                                                 ...   ...
-886                              Montvila, Rev. Juozas  27.0
-887                       Graham, Miss. Margaret Edith  19.0
-888           Johnston, Miss. Catherine Helen "Carrie"   NaN
-889                              Behr, Mr. Karl Howell  26.0
-890                                Dooley, Mr. Patrick  32.0
+886                              Example, Rev. Finley  27.0
+887                       Sample, Miss. Gray  19.0
+888           Demo, Miss. Harper   NaN
+889                              Placeholder, Mr. Jules  26.0
+890                                Record, Mr. Kelly  32.0
 
 [891 rows x 2 columns]
 ```
@@ -283,30 +287,30 @@ clean_data
 890          891         0       3   
 
                                                   Name     Sex   Age  SibSp  \
-0                              Braund, Mr. Owen Harris    male  22.0      1   
-1    Cumings, Mrs. John Bradley (Florence Briggs Th...  female  38.0      1   
-2                               Heikkinen, Miss. Laina  female  26.0      0   
-3         Futrelle, Mrs. Jacques Heath (Lily May Peel)  female  35.0      1   
-4                             Allen, Mr. William Henry    male  35.0      0   
+0                              Example, Mr. Alex    male  22.0      1   
+1    Sample, Mrs. Blair  female  38.0      1   
+2                               Demo, Miss. Casey  female  26.0      0   
+3         Placeholder, Mrs. Dana  female  35.0      1   
+4                             Record, Mr. Ellis    male  35.0      0   
 ..                                                 ...     ...   ...    ...   
-886                              Montvila, Rev. Juozas    male  27.0      0   
-887                       Graham, Miss. Margaret Edith  female  19.0      0   
-888           Johnston, Miss. Catherine Helen "Carrie"  female  28.0      1   
-889                              Behr, Mr. Karl Howell    male  26.0      0   
-890                                Dooley, Mr. Patrick    male  32.0      0   
+886                              Example, Rev. Finley    male  27.0      0   
+887                       Sample, Miss. Gray  female  19.0      0   
+888           Demo, Miss. Harper  female  28.0      1   
+889                              Placeholder, Mr. Jules    male  26.0      0   
+890                                Record, Mr. Kelly    male  32.0      0   
 
      Parch            Ticket     Fare Embarked  
-0        0         A/5 21171   7.2500        S  
-1        0          PC 17599  71.2833        C  
-2        0  STON/O2. 3101282   7.9250        S  
-3        0            113803  53.1000        S  
-4        0            373450   8.0500        S  
+0        0         DEMO-0001   7.2500        S  
+1        0          DEMO-0002  71.2833        C  
+2        0  DEMO-0003   7.9250        S  
+3        0            DEMO-0004  53.1000        S  
+4        0            DEMO-0005   8.0500        S  
 ..     ...               ...      ...      ...  
-886      0            211536  13.0000        S  
-887      0            112053  30.0000        S  
-888      2        W./C. 6607  23.4500        S  
-889      0            111369  30.0000        C  
-890      0            370376   7.7500        Q  
+886      0            DEMO-0887  13.0000        S  
+887      0            DEMO-0888  30.0000        S  
+888      2        DEMO-0889  23.4500        S  
+889      0            DEMO-0890  30.0000        C  
+890      0            DEMO-0891   7.7500        Q  
 
 [891 rows x 11 columns]
 ```
