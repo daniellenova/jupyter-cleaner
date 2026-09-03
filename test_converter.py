@@ -26,7 +26,6 @@ from jupyter_cleaner.outputs import OutputProcessor, convert_output
 from jupyter_cleaner.tables import TableConverter
 from jupyter_cleaner.types import Notebook
 
-
 # Импортируем тестируемые функции из модуля converter
 
 
