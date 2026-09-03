@@ -6,11 +6,11 @@ import html
 class TableConverter:
     """Преобразует зафиксированный формат HTML-таблицы Pandas в Markdown."""
 
-    def is_supported(self, html_text):
+    def is_supported(self, html_text: str) -> bool:
         """Проверяет, соответствует ли HTML поддерживаемому формату Pandas."""
         return self._parse(html_text) is not None
 
-    def convert(self, html_text):
+    def convert(self, html_text: str) -> str | None:
         """Возвращает Markdown-таблицу либо ``None`` для неподдерживаемого HTML."""
         rows = self._parse(html_text)
         if rows is None:
@@ -20,7 +20,7 @@ class TableConverter:
         return "\n".join(markdown_rows)
 
     @staticmethod
-    def _opening_tag_end(html_text, tag_name, start):
+    def _opening_tag_end(html_text: str, tag_name: str, start: int) -> int:
         prefix = f"<{tag_name}"
         if not html_text.startswith(prefix, start):
             return -1
@@ -29,8 +29,8 @@ class TableConverter:
             return -1
         return html_text.find(">", name_end)
 
-    def _extract_blocks(self, html_text, tag_name):
-        blocks = []
+    def _extract_blocks(self, html_text: str, tag_name: str) -> list[str] | None:
+        blocks: list[str] = []
         position = 0
         closing_tag = f"</{tag_name}>"
         while position < len(html_text):
@@ -48,8 +48,8 @@ class TableConverter:
             position = closing_start + len(closing_tag)
         return blocks
 
-    def _extract_cells(self, row_html):
-        cells = []
+    def _extract_cells(self, row_html: str) -> list[tuple[str, str]] | None:
+        cells: list[tuple[str, str]] = []
         position = 0
         while position < len(row_html):
             while position < len(row_html) and row_html[position].isspace():
@@ -80,7 +80,7 @@ class TableConverter:
             position = closing_start + len(closing_tag)
         return cells
 
-    def _has_supported_wrapper(self, prefix, suffix):
+    def _has_supported_wrapper(self, prefix: str, suffix: str) -> bool:
         position = 0
         while position < len(prefix) and prefix[position].isspace():
             position += 1
@@ -102,9 +102,7 @@ class TableConverter:
             return False
         return suffix.strip() == ("</div>" if has_div else "")
 
-    def _parse(self, html_text):
-        if not isinstance(html_text, str):
-            return None
+    def _parse(self, html_text: str) -> list[list[str]] | None:
         table_start = html_text.find("<table")
         if table_start == -1:
             return None
@@ -130,7 +128,7 @@ class TableConverter:
         table_body = html_text[table_open_end + 1:table_close]
         if "<table" in table_body or "rowspan" in table_body.lower() or "colspan" in table_body.lower():
             return None
-        sections = []
+        sections: list[str] = []
         position = 0
         for section_name in ("thead", "tbody"):
             while position < len(table_body) and table_body[position].isspace():
@@ -150,9 +148,10 @@ class TableConverter:
         data_rows = self._extract_blocks(sections[1], "tr")
         if header_rows is None or len(header_rows) != 1 or not data_rows:
             return None
-        parsed_rows = [self._extract_cells(row) for row in header_rows + data_rows]
-        if any(not row for row in parsed_rows):
+        optional_rows = [self._extract_cells(row) for row in header_rows + data_rows]
+        if any(not row for row in optional_rows):
             return None
+        parsed_rows = [row for row in optional_rows if row is not None]
         column_count = len(parsed_rows[0])
         if any(len(row) != column_count for row in parsed_rows):
             return None
