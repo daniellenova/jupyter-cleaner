@@ -1,5 +1,5 @@
-from config import ConversionConfig
-from outputs import OutputProcessor
+from .config import ConversionConfig
+from .outputs import OutputProcessor
 
 
 class Cell:

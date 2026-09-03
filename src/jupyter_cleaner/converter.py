@@ -2,11 +2,11 @@ import json  # Импортируем модуль json для работы с J
 import os  # Импортируем модуль os для получения размеров файлов
 import sys  # Импортируем модуль sys для работы с аргументами командной строки
 
-from cells import CodeCell, MarkdownCell
-from config import ConversionConfig
-from exceptions import InvalidNotebookError, NotebookNotFoundError
-from models import ConversionResult, ConversionStats
-from outputs import OutputProcessor
+from .cells import CodeCell, MarkdownCell
+from .config import ConversionConfig
+from .exceptions import InvalidNotebookError, NotebookNotFoundError
+from .models import ConversionResult, ConversionStats
+from .outputs import OutputProcessor
 
 
 def load_notebook(file_path):

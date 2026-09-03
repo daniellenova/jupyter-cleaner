@@ -5,17 +5,21 @@ from json import JSONDecodeError
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from cells import Cell, CodeCell, MarkdownCell
-from config import ConversionConfig
-from converter import (
+from jupyter_cleaner.cells import Cell, CodeCell, MarkdownCell
+from jupyter_cleaner.config import ConversionConfig
+from jupyter_cleaner.converter import (
     NotebookConverter,
     convert_notebook,
     load_notebook,
 )
-from exceptions import InvalidNotebookError, NotebookError, NotebookNotFoundError
-from models import ConversionResult, ConversionStats
-from outputs import OutputProcessor, convert_output
-from tables import TableConverter
+from jupyter_cleaner.exceptions import (
+    InvalidNotebookError,
+    NotebookError,
+    NotebookNotFoundError,
+)
+from jupyter_cleaner.models import ConversionResult, ConversionStats
+from jupyter_cleaner.outputs import OutputProcessor, convert_output
+from jupyter_cleaner.tables import TableConverter
 
 
 # Импортируем тестируемые функции из модуля converter

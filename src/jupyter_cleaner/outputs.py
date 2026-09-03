@@ -1,7 +1,7 @@
 """Преобразование результатов выполнения Jupyter в Markdown."""
 
-from config import ConversionConfig
-from tables import TableConverter
+from .config import ConversionConfig
+from .tables import TableConverter
 
 
 def normalize_output_text(value):
