@@ -17,6 +17,11 @@ app = typer.Typer(
 )
 
 
+@app.callback()
+def main() -> None:
+    """Команды для преобразования Jupyter notebook."""
+
+
 def format_file_size(size_bytes: int) -> str:
     """Возвращает размер файла в удобочитаемом виде."""
     if size_bytes < 1024:
@@ -71,6 +76,7 @@ def convert(
             Path,
             typer.Argument(
                 help="Путь к исходному notebook (.ipynb).",
+                metavar="FILE",
                 exists=False,
                 dir_okay=False,
             ),

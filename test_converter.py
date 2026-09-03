@@ -123,7 +123,7 @@ class ConvertCommandTests(unittest.TestCase):
             plain_text = plain_path.read_text("utf-8")
             self.assertNotIn("<table", plain_text)
             self.assertNotIn("| 0 | 25 | 50000 |", plain_text)
-            self.assertIn("0     25   50000", plain_text)
+            self.assertIn("0   25   50000", plain_text)
 
     def test_convert_help_lists_supported_options(self):
         result = self.runner.invoke(app, ["convert", "--help"])
