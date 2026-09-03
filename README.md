@@ -32,19 +32,19 @@ Jupyter Cleaner решает эту задачу автоматически.
 
 В репозитории есть настоящий пример преобразования:
 
-[Исходный блокнот Jupyter](https://chatgpt.com/g/g-p-6a8ff4773df481918627e21ad431f52c/c/examples/example.ipynb) → [готовый Markdown](https://chatgpt.com/g/g-p-6a8ff4773df481918627e21ad431f52c/c/examples/example.md)
+[Исходный блокнот Jupyter](examples/example.ipynb) → [готовый Markdown](examples/example.md)
 
 Для этого примера получились следующие результаты:
 
 |Показатель|Результат|
 |---|--:|
-|Размер исходного файла|358,47 КиБ|
+|Размер исходного файла|358,50 КиБ|
 |Размер Markdown|38,19 КиБ|
 |Уменьшение размера|89,3 %|
 |Удалено представлений HTML|16|
 |Преобразовано таблиц|3|
 
-Точные значения в байтах и способ измерения находятся в [описании примера](https://chatgpt.com/g/g-p-6a8ff4773df481918627e21ad431f52c/c/docs/example_metrics.md).
+Точные значения в байтах и способ измерения находятся в [описании примера](docs/example_metrics.md).
 
 ## Установка
 
@@ -55,23 +55,23 @@ Jupyter Cleaner решает эту задачу автоматически.
 ```bash
 git clone https://github.com/daniellenova/jupyter-cleaner
 cd jupyter-cleaner
-uv sync --locked
+uv sync --locked --dev
 ```
 
-Команда `uv sync --locked` создаст окружение и установит именно те версии зависимостей, которые зафиксированы в `uv.lock`.
+Команда `uv sync --locked --dev` создаст окружение и установит именно те версии основных и разработческих зависимостей, которые зафиксированы в `uv.lock`. Это позволяет сразу запускать программу и все проверки качества.
 
 ## Как пользоваться
 
 Самый простой вариант:
 
 ```bash
-uv run jupyter-cleaner convert examples/basic.ipynb
+uv run jupyter-cleaner convert examples/example.ipynb --keep-outputs
 ```
 
 Рядом с исходным файлом появится:
 
 ```text
-examples/basic.md
+examples/example.md
 ```
 
 По умолчанию все результаты выполнения ячеек удаляются.
@@ -81,7 +81,7 @@ examples/basic.md
 Если нужно оставить обычный текстовый вывод и поддерживаемые таблицы:
 
 ```bash
-uv run jupyter-cleaner convert examples/table.ipynb --keep-outputs
+uv run jupyter-cleaner convert examples/example.ipynb --keep-outputs
 ```
 
 Например, результат:
@@ -103,7 +103,7 @@ print("Привет!")
 Если результаты нужно сохранить, но таблицы не нужно превращать в Markdown:
 
 ```bash
-uv run jupyter-cleaner convert examples/table.ipynb \
+uv run jupyter-cleaner convert examples/example.ipynb \
     --keep-outputs \
     --no-tables
 ```
@@ -113,14 +113,14 @@ uv run jupyter-cleaner convert examples/table.ipynb \
 ### Указать имя итогового файла
 
 ```bash
-uv run jupyter-cleaner convert examples/basic.ipynb \
+uv run jupyter-cleaner convert examples/example.ipynb \
     --output notes.md
 ```
 
 Короткая запись:
 
 ```bash
-uv run jupyter-cleaner convert examples/basic.ipynb -o notes.md
+uv run jupyter-cleaner convert examples/example.ipynb -o notes.md
 ```
 
 ### Обработать целый каталог
@@ -266,7 +266,7 @@ Markdown
 .md
 ```
 
-Более подробное описание находится в [документе об устройстве проекта](https://chatgpt.com/g/g-p-6a8ff4773df481918627e21ad431f52c/c/docs/architecture.md).
+Более подробное описание находится в [документе об устройстве проекта](docs/architecture.md).
 
 ## Почему я сделал этот проект
 
