@@ -29,6 +29,8 @@ line-length = 100
 extend-exclude = [
     "examples/*.ipynb",
     "tests/fixtures/*.ipynb",
+    # Golden files must preserve notebook source byte-for-byte, including quote style.
+    "tests/fixtures/*.expected.md",
 ]
 
 [tool.ruff.lint]
