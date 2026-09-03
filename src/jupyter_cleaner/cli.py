@@ -70,15 +70,30 @@ def print_file_size_stats(stats: ConversionStats) -> None:
         typer.echo(f"Изменение размера: {-stats.size_reduction_percent:+.1f} %")
 
 
+def convert_file(
+        file: Path, config: ConversionConfig, output: Path | None = None
+) -> None:
+    """Преобразует один notebook и печатает его статистику."""
+    notebook = load_notebook(file)
+    input_size = file.stat().st_size
+    result = NotebookConverter(config).convert(notebook)
+    output_path = output if output is not None else file.with_suffix(".md")
+    output_path.write_text(result.markdown_text, encoding="utf-8")
+    add_file_size_stats(result.stats, input_size, output_path.stat().st_size)
+
+    typer.echo(f"Создан файл: {output_path}")
+    print_stats(result.stats)
+    print_file_size_stats(result.stats)
+
+
 @app.command()
 def convert(
-        file: Annotated[
+        path: Annotated[
             Path,
             typer.Argument(
-                help="Путь к исходному notebook (.ipynb).",
-                metavar="FILE",
+                help="Путь к исходному notebook (.ipynb) или каталогу.",
+                metavar="PATH",
                 exists=False,
-                dir_okay=False,
             ),
         ],
         keep_outputs: Annotated[
@@ -105,29 +120,60 @@ def convert(
             ),
         ] = None,
 ) -> None:
-    """Преобразует один notebook в Markdown-файл."""
-    try:
-        notebook = load_notebook(file)
-    except NotebookNotFoundError:
-        typer.echo(f"Ошибка: файл '{file}' не найден.", err=True)
-        raise typer.Exit(code=1) from None
-    except InvalidNotebookError:
-        typer.echo(
-            f"Ошибка: файл '{file}' содержит некорректный JSON.",
-            err=True,
-        )
-        raise typer.Exit(code=1) from None
-
-    input_size = file.stat().st_size
+    """Преобразует notebook или все notebook-файлы в каталоге."""
     config = ConversionConfig(
         keep_outputs=keep_outputs,
         convert_tables=not no_tables,
     )
-    result = NotebookConverter(config).convert(notebook)
-    output_path = output if output is not None else file.with_suffix(".md")
-    output_path.write_text(result.markdown_text, encoding="utf-8")
-    add_file_size_stats(result.stats, input_size, output_path.stat().st_size)
 
-    typer.echo(f"Создан файл: {output_path}")
-    print_stats(result.stats)
-    print_file_size_stats(result.stats)
+    if path.is_dir():
+        if output is not None:
+            typer.echo(
+                "Ошибка: --output нельзя использовать при обработке каталога.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        notebook_paths = sorted(path.glob("*.ipynb"), key=lambda item: item.name)
+        if not notebook_paths:
+            typer.echo("В каталоге не найдено файлов .ipynb.", err=True)
+            raise typer.Exit(code=1)
+
+        succeeded = 0
+        failed = 0
+        for notebook_path in notebook_paths:
+            try:
+                convert_file(notebook_path, config)
+            except InvalidNotebookError:
+                typer.echo(
+                    f"Ошибка: файл '{notebook_path}' содержит некорректный JSON.",
+                    err=True,
+                )
+                failed += 1
+            except (KeyError, TypeError, OSError) as error:
+                typer.echo(
+                    f"Ошибка при обработке '{notebook_path}': {error}",
+                    err=True,
+                )
+                failed += 1
+            else:
+                succeeded += 1
+
+        typer.echo(f"Преобразовано: {succeeded}")
+        typer.echo(f"Ошибок: {failed}")
+        typer.echo(f"Всего: {len(notebook_paths)}")
+        if failed:
+            raise typer.Exit(code=1)
+        return
+
+    try:
+        convert_file(path, config, output)
+    except NotebookNotFoundError:
+        typer.echo(f"Ошибка: файл '{path}' не найден.", err=True)
+        raise typer.Exit(code=1) from None
+    except InvalidNotebookError:
+        typer.echo(
+            f"Ошибка: файл '{path}' содержит некорректный JSON.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None

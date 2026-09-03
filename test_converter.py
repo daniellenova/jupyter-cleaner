@@ -129,7 +129,7 @@ class ConvertCommandTests(unittest.TestCase):
         result = self.runner.invoke(app, ["convert", "--help"])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("FILE", result.stdout)
+        self.assertIn("PATH", result.stdout)
         self.assertIn("--keep-outputs", result.stdout)
         self.assertIn("--no-tables", result.stdout)
         self.assertIn("--output", result.stdout)
@@ -152,6 +152,90 @@ class ConvertCommandTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("некорректный JSON", result.output)
         self.assertNotIn("Traceback", result.output)
+
+    def test_convert_directory_processes_sorted_top_level_notebooks(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory)
+            nested = path / "nested"
+            nested.mkdir()
+            for notebook_path, heading in (
+                    (path / "b.ipynb", "# B"),
+                    (path / "a.ipynb", "# A"),
+                    (nested / "ignored.ipynb", "# Ignored"),
+            ):
+                notebook_path.write_text(
+                    '{"cells": [{"cell_type": "markdown", "source": ['
+                    f'"{heading}"]}}]}}',
+                    encoding="utf-8",
+                )
+
+            result = self.runner.invoke(app, ["convert", str(path)])
+
+            self.assertEqual(result.exit_code, 0)
+            self.assertEqual((path / "a.md").read_text("utf-8"), "# A")
+            self.assertEqual((path / "b.md").read_text("utf-8"), "# B")
+            self.assertFalse((nested / "ignored.md").exists())
+            self.assertLess(
+                result.stdout.index("a.md"), result.stdout.index("b.md")
+            )
+            self.assertIn("Преобразовано: 2", result.stdout)
+            self.assertIn("Ошибок: 0", result.stdout)
+            self.assertIn("Всего: 2", result.stdout)
+
+    def test_convert_directory_continues_after_invalid_notebook(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / "broken.ipynb").write_text("{broken", encoding="utf-8")
+            valid = path / "valid.ipynb"
+            valid.write_text(
+                '{"cells": [{"cell_type": "markdown", "source": ["ok"]}]}',
+                encoding="utf-8",
+            )
+
+            result = self.runner.invoke(app, ["convert", str(path)])
+
+            self.assertEqual(result.exit_code, 1)
+            self.assertTrue(valid.with_suffix(".md").exists())
+            self.assertIn("broken.ipynb", result.output)
+            self.assertIn("Преобразовано: 1", result.output)
+            self.assertIn("Ошибок: 1", result.output)
+            self.assertIn("Всего: 2", result.output)
+
+    def test_convert_empty_directory_fails_with_clear_message(self):
+        with TemporaryDirectory() as directory:
+            result = self.runner.invoke(app, ["convert", directory])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("В каталоге не найдено файлов .ipynb.", result.output)
+
+    def test_convert_directory_rejects_output_option(self):
+        with TemporaryDirectory() as directory:
+            result = self.runner.invoke(
+                app, ["convert", directory, "--output", "combined.md"]
+            )
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("--output нельзя использовать", result.output)
+
+    def test_convert_directory_applies_conversion_options_to_every_file(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory)
+            for name in ("first.ipynb", "second.ipynb"):
+                (path / name).write_text(
+                    '{"cells": [{"cell_type": "code", "source": ["print(1)"], '
+                    '"outputs": [{"output_type": "stream", "text": ["1\\n"]}]}]}',
+                    encoding="utf-8",
+                )
+
+            result = self.runner.invoke(
+                app, ["convert", str(path), "--keep-outputs", "--no-tables"]
+            )
+
+            self.assertEqual(result.exit_code, 0)
+            output_paths = list(path.glob("*.md"))
+            self.assertEqual(len(output_paths), 2)
+            for output_path in output_paths:
+                self.assertIn("```text\n1\n```", output_path.read_text("utf-8"))
 
 
 class ConversionModelTests(unittest.TestCase):

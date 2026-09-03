@@ -18,13 +18,21 @@ uv run jupyter-cleaner convert examples/basic.ipynb
 ## Параметры `convert`
 
 ```text
-jupyter-cleaner convert FILE [--keep-outputs] [--no-tables] [--output PATH]
+jupyter-cleaner convert PATH [--keep-outputs] [--no-tables] [--output PATH]
 ```
 
-* `FILE` — путь к исходному `.ipynb`;
+* `PATH` — путь к исходному `.ipynb` или каталогу с notebook-файлами;
 * `--keep-outputs` — сохранить поддерживаемые текстовые результаты выполнения;
 * `--no-tables` — не преобразовывать HTML-таблицы Pandas в Markdown-таблицы;
 * `--output PATH`, `-o PATH` — записать результат по указанному пути.
+
+Если указан каталог, команда преобразует все файлы `*.ipynb`, находящиеся
+непосредственно в нём, в алфавитном порядке. Вложенные каталоги не
+просматриваются. Для каждого notebook файл `.md` создаётся рядом с исходником,
+поэтому `--output` в каталоговом режиме использовать нельзя. Ошибка в одном
+файле не останавливает обработку остальных; итоговая сводка показывает число
+успешных и неуспешных преобразований.
+
 
 Примеры:
 
@@ -32,6 +40,7 @@ jupyter-cleaner convert FILE [--keep-outputs] [--no-tables] [--output PATH]
 uv run jupyter-cleaner convert examples/table.ipynb --keep-outputs
 uv run jupyter-cleaner convert examples/table.ipynb --keep-outputs --no-tables
 uv run jupyter-cleaner convert examples/basic.ipynb -o examples/custom.md
+uv run jupyter-cleaner convert examples/
 uv run jupyter-cleaner convert --help
 ```
 
