@@ -7,10 +7,12 @@ authors = [
     { name = "Danielle Nova", email = "99331448+oNovalSliveDNo@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "typer",
+]
 
 [project.scripts]
-jupyter-cleaner = "jupyter_cleaner.converter:main"
+jupyter-cleaner = "jupyter_cleaner.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]
