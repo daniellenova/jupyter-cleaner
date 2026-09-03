@@ -18,3 +18,12 @@ jupyter-cleaner = "jupyter_cleaner.cli:app"
 [build-system]
 requires = ["uv_build>=0.7.22,<0.8.0"]
 build-backend = "uv_build"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+]
