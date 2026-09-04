@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Convert Jupyter notebooks to clean, compact Markdown."
 readme = "README.md"
 authors = [
-    { name = "Danielle Nova", email = "99331448+oNovalSliveDNo@users.noreply.github.com" }
+    { name = "Danielle Nova", email = "99331448+daniellenova@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
 dependencies = [
